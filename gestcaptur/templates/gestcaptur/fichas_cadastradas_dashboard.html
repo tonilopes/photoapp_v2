@@ -1,0 +1,261 @@
+<div class="py-3">
+    <!-- SEÇÃO: Eventos com Formandos (Autoatendimento) -->
+    <div class="mb-5">
+        <h4 class="mb-3">
+            <i class="bi bi-person-check"></i> Formandos - Autoatendimento (Selfie + Cadastro)
+        </h4>
+        <p class="text-muted small mb-3">
+            Gerenciamento de eventos onde formandos fazem selfie e cadastro por autoatendimento.
+        </p>
+
+        {% if eventos_com_formandos %}
+        <div class="mb-3">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="buscaEventosFormandos" class="form-control"
+                       placeholder="Buscar por FOT, instituição, parceiro ou data (dd/mm/aaaa)...">
+            </div>
+            <small class="text-muted" id="buscaEventosFormandosContador"></small>
+        </div>
+        <div class="row g-3" id="listaEventosFormandos">
+            {% for evento in eventos_com_formandos %}
+            <div class="col-md-6 col-lg-4 card-evento-formando"
+                 data-busca="{{ evento.fot|lower }} {{ evento.instituicao|lower }} {{ evento.data|date:'d/m/Y' }} {% for p in evento.parceiros.all %}{{ p.username|lower }} {{ p.first_name|lower }} {% endfor %}">
+                <div class="card h-100 shadow-sm border-primary">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-start"
+                         style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#cardBodyFormando{{ evento.id }}"
+                         aria-expanded="false" aria-controls="cardBodyFormando{{ evento.id }}">
+                        <div>
+                            <h6 class="mb-1">{{ evento.fot }}</h6>
+                            <small>{{ evento.instituicao }}</small>
+                            {% if evento.parceiros.all %}
+                            <div class="mt-1">
+                                {% for p in evento.parceiros.all %}
+                                <span class="badge bg-light text-primary">{{ p.first_name|default:p.username }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <i class="bi bi-chevron-down"></i>
+                    </div>
+                    <div class="collapse" id="cardBodyFormando{{ evento.id }}">
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <small class="text-muted">Evento ID:</small><br>
+                            <small class="text-monospace">{{ evento.id }}</small>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Data:</small><br>
+                            <small><strong>{{ evento.data|date:"d/m/Y" }}</strong></small>
+                        </div>
+                        
+                        <!-- Status do Evento -->
+                        <div class="mb-3">
+                            <div class="row g-2 text-center">
+                                <div class="col-6">
+                                    <div class="p-2 bg-light rounded">
+                                        <strong>{{ evento.alunos.count }}</strong><br>
+                                        <small class="text-muted">Formandos</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 bg-light rounded">
+                                        <strong>{% widthratio evento.alunos_com_selfie evento.alunos.count 100 %}%</strong><br>
+                                        <small class="text-muted">Com Selfie</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'formandos_status_uuid' evento.uuid %}" class="btn btn-primary btn-sm" title="Painel de Controle">
+                                <i class="bi bi-graph-up"></i> Painel de Controle
+                            </a>
+                            <a href="{% url 'formandos_link_compartilhamento_uuid' evento.uuid %}" class="btn btn-outline-primary btn-sm" title="Compartilhar Link">
+                                <i class="bi bi-share-fill"></i> Link/QRCode
+                            </a>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info" role="alert">
+            <i class="bi bi-info-circle"></i> Nenhum evento com formandos configurado no momento.
+        </div>
+        {% endif %}
+    </div>
+
+    <hr class="my-5">
+
+    <!-- SEÇÃO: Fichas Cadastradas (Legado) -->
+    <h4 class="mb-3">Fichas Cadastradas</h4>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-2">
+            <input type="text" name="fot" class="form-control" placeholder="Fot" value="{{ filtros.fot|default:'' }}">
+        </div>
+        <div class="col-md-3">
+            <input type="text" name="empresa" class="form-control" placeholder="Empresa" value="{{ filtros.empresa|default:'' }}">
+        </div>
+        <div class="col-md-3">
+            <input type="text" name="tipo_evento" class="form-control" placeholder="Tipo de Evento" value="{{ filtros.tipo_evento|default:'' }}">
+        </div>
+        <div class="col-md-2">
+            <input type="date" name="data" class="form-control" value="{{ filtros.data|default:'' }}">
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">🔎 Filtrar</button>
+            <a href="{% url 'fichas_cadastradas' %}" class="btn btn-outline-secondary">✖ Limpar</a>
+        </div>
+    </form>
+
+    <form method="get" action="">
+        <div class="mb-3">
+            <label for="eventoSelect" class="form-label">Exportar fichas de:</label>
+            <select name="evento_id" id="eventoSelect" class="form-select d-inline w-auto">
+                <option value="">Selecione o evento</option>
+                {% for key, alunos_evento in eventos.items %}
+                    <option value="{{ key.0 }}">{{ key.1 }} - {{ key.2 }}</option>
+                {% endfor %}
+            </select>
+            {% if perms.gestcaptur.download_cadastros_evento %}
+            <button type="submit" formaction="{% url 'exportar_fichas' %}" class="btn btn-success ms-2">⬇ Exportar XLSX</button>
+            {% endif %}
+            {% if perms.gestcaptur.download_fotos_evento %}
+            <button type="submit" formaction="{% url 'exportar_fotos_evento' %}" class="btn btn-secondary">⬇ Baixar Fotos</button>
+            {% endif %}
+            {% if can_finalizar_captura %}
+            <button type="button" class="btn btn-danger" onclick="finalizarCapturaSelecionada()">Finalizar</button>
+            {% endif %}
+        </div>
+    </form>
+
+    <div class="accordion" id="accordionEventos">
+        {% for key, alunos_evento in eventos.items %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ key.0 }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ key.0 }}" aria-expanded="false" aria-controls="collapse{{ key.0 }}">
+                    {{ key.1 }} - {{ key.2 }}
+                </button>
+            </h2>
+            <div id="collapse{{ key.0 }}" class="accordion-collapse collapse" aria-labelledby="heading{{ key.0 }}" data-bs-parent="#accordionEventos">
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Foto</th>
+                                    <th>Nome</th>
+                                    <th>Email</th>
+                                    <th>CPF</th>
+                                    <th>Whatsapp</th>
+                                    <!-- Adicione outros campos conforme necessário -->
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for aluno in alunos_evento %}
+                                <tr>
+                                    <td>
+                                        {% if aluno.foto %}
+                                            <img src="{{ aluno.foto.url }}" alt="Foto" style="width:48px; height:48px; object-fit:cover; border-radius:6px;">
+                                        {% else %}
+                                            <span class="text-muted">Sem foto</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ aluno.nome }}</td>
+                                    <td>{{ aluno.email }}</td>
+                                    <td>{{ aluno.cpf }}</td>
+                                    <td>{{ aluno.whatsapp }}</td>
+                                    <!-- Outros campos -->
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="5" class="text-center text-muted">Nenhuma ficha cadastrada.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-info mt-4">Nenhuma ficha cadastrada encontrada.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<block extra_scripts>
+<script>
+function forcarDownloadDialog(url, filename) {
+    // Criar elemento temporário
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    
+    // Adicionar ao DOM e clicar
+    document.body.appendChild(link);
+    link.click();
+    
+    // Remover do DOM
+    document.body.removeChild(link);
+}
+
+// Para exportar fichas
+function exportarFichas(eventoId) {
+    const url = `/exportar_fichas/?evento_id=${eventoId}`;
+    forcarDownloadDialog(url, '');
+}
+
+// Para exportar fotos
+function exportarFotos(eventoId) {
+    const url = `/exportar_fotos_evento/?evento_id=${eventoId}`;
+    forcarDownloadDialog(url, '');
+}
+
+function finalizarCapturaSelecionada() {
+    const eventoSelect = document.getElementById('eventoSelect');
+    if (!eventoSelect.value) {
+        alert('Selecione um evento antes de finalizar a captura.');
+        return;
+    }
+    const nomeEvento = eventoSelect.options[eventoSelect.selectedIndex].text;
+    finalizarCapturaEvento(eventoSelect.value, nomeEvento);
+}
+
+// Busca múltipla (FOT, instituição, parceiro ou data) nos cards de Formandos - Autoatendimento
+(function() {
+    const input = document.getElementById('buscaEventosFormandos');
+    const contador = document.getElementById('buscaEventosFormandosContador');
+    if (!input) return;
+    const cards = document.querySelectorAll('#listaEventosFormandos .card-evento-formando');
+
+    function filtrar() {
+        const termo = input.value.trim().toLowerCase();
+        let visiveis = 0;
+        cards.forEach(function(card) {
+            const texto = card.dataset.busca || '';
+            const bate = !termo || texto.includes(termo);
+            card.style.display = bate ? '' : 'none';
+            if (bate) visiveis++;
+        });
+        if (contador) {
+            contador.textContent = termo ? `${visiveis} de ${cards.length} evento(s) encontrado(s)` : '';
+        }
+    }
+
+    input.addEventListener('input', filtrar);
+})();
+
+// Gira o ícone de seta ao expandir/colapsar os cards de Formandos - Autoatendimento
+document.querySelectorAll('#listaEventosFormandos .card-header[data-bs-toggle="collapse"]').forEach(function(header) {
+    const alvo = document.querySelector(header.dataset.bsTarget);
+    if (!alvo) return;
+    const seta = header.querySelector('.bi-chevron-down');
+    alvo.addEventListener('show.bs.collapse', function() { if (seta) seta.classList.replace('bi-chevron-down', 'bi-chevron-up'); });
+    alvo.addEventListener('hide.bs.collapse', function() { if (seta) seta.classList.replace('bi-chevron-up', 'bi-chevron-down'); });
+});
+</script>
+</block>

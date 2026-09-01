@@ -1,0 +1,295 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load static %}
+
+{% block title %}Compartilhar Link com Parceiro - {{ evento.fot }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-12">
+            <h2><i class="bi bi-share-fill"></i> Compartilhar Acesso com Parceiro</h2>
+            <p class="text-muted">{{ evento.fot }} - {{ evento.instituicao }}</p>
+            <hr>
+        </div>
+    </div>
+
+    <!-- Aviso de Segurança -->
+    <div class="alert alert-warning mb-4">
+        <h6><i class="bi bi-shield-exclamation"></i> ⚠️ SEGURANÇA IMPORTANTE</h6>
+        <ul class="mb-0">
+            <li><strong>O link agora REQUER login e senha</strong> - não pode ser acessado sem autenticação</li>
+            <li>Compartilhe <strong>APENAS</strong> com o parceiro autorizado</li>
+            <li>Cada parceiro terá seu próprio usuário e senha - <strong>NÃO compartilhe</strong> credenciais entre parceiros</li>
+            <li>Se precisar revogar acesso, remova o parceiro em "Gerenciar Parceiros"</li>
+        </ul>
+    </div>
+
+    <!-- Parceiros Vinculados -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-people-fill"></i> Parceiros com Acesso a Este Evento</h5>
+                </div>
+                <div class="card-body">
+                    {% if parceiros %}
+                    <p class="text-muted">Compartilhe as credenciais de <strong>um parceiro por vez</strong> com cada pessoa autorizada:</p>
+                    
+                    <div class="accordion" id="accordionParceiros">
+                        {% for parceiro in parceiros %}
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button 
+                                    class="accordion-button {% if forloop.first %}{% else %}collapsed{% endif %}" 
+                                    type="button" 
+                                    data-bs-toggle="collapse" 
+                                    data-bs-target="#parceiro{{ parceiro.id }}"
+                                >
+                                    <i class="bi bi-person-circle"></i> {{ parceiro.username }}
+                                    <span class="badge bg-info ms-2">{{ parceiro.first_name }} {{ parceiro.last_name }}</span>
+                                </button>
+                            </h2>
+                            <div 
+                                id="parceiro{{ parceiro.id }}" 
+                                class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" 
+                                data-bs-parent="#accordionParceiros"
+                            >
+                                <div class="accordion-body">
+                                    <!-- Link do Painel -->
+                                    <div class="mb-4 p-3 border rounded" style="background-color: #f8f9fa;">
+                                        <h6 class="mb-3"><i class="bi bi-link"></i> Link do Painel de Formandos</h6>
+                                        <div class="input-group">
+                                            <input 
+                                                type="text" 
+                                                class="form-control font-monospace" 
+                                                value="{{ link_painel }}"
+                                                id="link-{{ parceiro.id }}"
+                                                readonly
+                                            >
+                                            <button 
+                                                class="btn btn-outline-secondary" 
+                                                type="button"
+                                                onclick="copyToClipboard('link-{{ parceiro.id }}')"
+                                                title="Copiar link"
+                                            >
+                                                <i class="bi bi-clipboard"></i> Copiar
+                                            </button>
+                                        </div>
+                                        <small class="text-muted d-block mt-2">
+                                            Este link requer autenticação. O parceiro deve fazer login primeiro.
+                                        </small>
+                                    </div>
+
+                                    <!-- Credenciais de Login -->
+                                    <div class="mb-4 p-3 border rounded border-warning" style="background-color: #fff3cd;">
+                                        <h6 class="mb-3"><i class="bi bi-lock"></i> 🔐 Credenciais de Acesso</h6>
+                                        <p class="text-danger">
+                                            <strong>⚠️ COMPARTILHE APENAS COM O PARCEIRO AUTORIZADO</strong>
+                                        </p>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Usuário (Username)</label>
+                                            <div class="input-group">
+                                                <input 
+                                                    type="text" 
+                                                    class="form-control font-monospace font-weight-bold" 
+                                                    value="{{ parceiro.username }}"
+                                                    id="username-{{ parceiro.id }}"
+                                                    readonly
+                                                >
+                                                <button 
+                                                    class="btn btn-outline-warning" 
+                                                    type="button"
+                                                    onclick="copyToClipboard('username-{{ parceiro.id }}')"
+                                                >
+                                                    <i class="bi bi-clipboard"></i> Copiar
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label">Senha</label>
+                                            <div class="input-group">
+                                                <input 
+                                                    type="password" 
+                                                    class="form-control font-monospace" 
+                                                    value="*not_displayed*"
+                                                    id="password-{{ parceiro.id }}"
+                                                    readonly
+                                                    data-password="[senha não pode ser recuperada]"
+                                                >
+                                                <button 
+                                                    class="btn btn-outline-warning" 
+                                                    type="button"
+                                                    id="btn-show-{{ parceiro.id }}"
+                                                    onclick="togglePassword('password-{{ parceiro.id }}', 'btn-show-{{ parceiro.id }}')"
+                                                >
+                                                    <i class="bi bi-eye"></i> Mostrar
+                                                </button>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">
+                                                ℹ️ A senha foi definida na criação do parceiro. Se o parceiro esqueceu, edite o parceiro em "Gerenciar Parceiros" e defina uma nova senha.
+                                            </small>
+                                        </div>
+
+                                        <div class="alert alert-info mb-0">
+                                            <strong>📋 Instruções para o Parceiro:</strong>
+                                            <ol class="mb-0 ms-3">
+                                                <li>Acesse o link acima no navegador</li>
+                                                <li>Se não estiver logado, você será redirecionado para a página de login</li>
+                                                <li>Use o <strong>usuário</strong> e <strong>senha</strong> acima para fazer login</li>
+                                                <li>Após login, poderá visualizar o painel de status dos formandos</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+
+                                    <!-- Instruções de Segurança -->
+                                    <div class="alert alert-secondary">
+                                        <h6 class="mb-2"><i class="bi bi-shield-lock"></i> Como Compartilhar com Segurança:</h6>
+                                        <ul class="mb-0">
+                                            <li>✅ Use <strong>WhatsApp, Email ou Mensagem Direta</strong> com criptografia</li>
+                                            <li>❌ NÃO envie em Slack, Discord ou mensagens de grupo</li>
+                                            <li>❌ NÃO coloque em documentos públicos ou compartilhados</li>
+                                            <li>⚠️ Revise as credenciais e o link ANTES de enviar</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> Nenhum parceiro vinculado ao evento.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar com Info -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Sobre Este Acesso</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-6">Evento:</dt>
+                        <dd class="col-6"><strong>{{ evento.fot }}</strong></dd>
+                        
+                        <dt class="col-6">Data:</dt>
+                        <dd class="col-6">{{ evento.data|date:"d/m/Y" }}</dd>
+                        
+                        <dt class="col-6">Instituição:</dt>
+                        <dd class="col-6">{{ evento.instituicao }}</dd>
+                        
+                        <dt class="col-6">Formandos:</dt>
+                        <dd class="col-6">{{ evento.alunos.count }}</dd>
+                        
+                        <dt class="col-6">Parceiros:</dt>
+                        <dd class="col-6">{{ parceiros|length }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="bi bi-lock-fill"></i> Permissões do Parceiro</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <span class="badge bg-success">✅</span>
+                            Visualizar status dos formandos
+                        </li>
+                        <li class="mb-2">
+                            <span class="badge bg-success">✅</span>
+                            Ver fotos (modal)
+                        </li>
+                        <li class="mb-2">
+                            <span class="badge bg-danger">❌</span>
+                            Baixar fotos/arquivos
+                        </li>
+                        <li class="mb-2">
+                            <span class="badge bg-danger">❌</span>
+                            Editar dados
+                        </li>
+                        <li class="mb-2">
+                            <span class="badge bg-danger">❌</span>
+                            Importar nomes
+                        </li>
+                        <li>
+                            <span class="badge bg-danger">❌</span>
+                            Compartilhar links
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botões de Ação -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{% url 'gerenciar_parceiros_evento_uuid' evento.uuid %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Voltar a Gerenciar Parceiros
+            </a>
+            <a href="{% url 'formandos_status_uuid' evento.uuid %}" class="btn btn-primary">
+                <i class="bi bi-arrow-right"></i> Ir para Painel de Formandos
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(elementId) {
+    const element = document.getElementById(elementId);
+    element.select();
+    document.execCommand('copy');
+    
+    // Mostrar feedback
+    const btn = event.target.closest('button');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check"></i> Copiado!';
+    
+    setTimeout(() => {
+        btn.innerHTML = originalHTML;
+    }, 2000);
+}
+
+function togglePassword(inputId, btnId) {
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById(btnId);
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = '<i class="bi bi-eye-slash"></i> Ocultar';
+    } else {
+        input.type = 'password';
+        btn.innerHTML = '<i class="bi bi-eye"></i> Mostrar';
+    }
+}
+</script>
+
+<style>
+    .accordion-button:not(.collapsed) {
+        background-color: #e7f3ff;
+        color: #0c63e4;
+    }
+    
+    .font-monospace {
+        font-family: 'Courier New', monospace;
+        font-size: 0.95rem;
+    }
+    
+    .border-warning {
+        border-color: #ffc107 !important;
+    }
+    
+    input[readonly] {
+        background-color: #f0f0f0;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}

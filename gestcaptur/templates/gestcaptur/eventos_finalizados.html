@@ -1,0 +1,34 @@
+{% block title %}Eventos Finalizados{% endblock %}
+{% block content %}
+<div class="container py-4">
+    <h2>Eventos Finalizados</h2>
+    <div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Evento</th>
+                <th>Instituição</th>
+                <th>Data</th>
+                <th>Total Alunos</th>
+                <th>Total Fotos</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for evento in eventos %}
+            <tr>
+                <td>{{ evento.tipo_evento }}</td>
+                <td>{{ evento.instituicao }}</td>
+                <td>{{ evento.data|date:"d/m/Y" }}</td>
+                <td>{{ evento.total_alunos }}</td>
+                <td>{{ evento.total_fotos_count }}</td>
+                <td><span class="badge bg-success">{{ evento.get_status_display }}</span></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center text-muted">Nenhum evento finalizado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</div>
+{% endblock %}

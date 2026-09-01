@@ -1,0 +1,140 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+*.pyc
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+*.log
+/media/
+/mediafiles/
+/event_photos/
+/staticfiles/
+/static_collected/
+local_settings.py
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+/venv/
+/static/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Backups
+*.backup
+*.bak
+*-backup*
+*-old.py
+settings-backup.py
+views\ copy*.py
+gunicorn-*backup*.service
+
+# Certificados e dados sensíveis
+*.pem
+*.key
+*.crt
+*.ca
+dados\ do\ ssl.txt
+certificado-wildcard_locaweb/
+
+# Arquivos temporários e de diagnóstico
+debug-*.txt
+diagnostico*.txt
+diagnostico*.sh
+projeto_info.txt
+projeto_analyzer.txt
+usuarios\ teste.txt
+ubuntuconfig.txt
+retorno.txt
+coletar_projeto.py
+project_analyzer.py
+project_analyzer.txt
+novo\ *.txt
+X\ reiniciar.txt
+*.har
+
+# Diretórios temporários
+2/
+
+# Planilhas
+planilhas/
+*.xlsx
+*.xls
+# Chaves e configs SSH (segredo - nunca versionar)
+.ssh/
+/ssh
+/ssh.pub
+/toni@photum.com.br
+/toni@photum.com.br.pub
+/config
+/ssh-config-corrigido
+
+# Scripts temporarios de analise (so raiz)
+/_*.py
+/_*.ps1
+/_*.txt
+
+# Scripts utilitarios de dev/backup (nao fazem parte do app)
+/backup_script.py
+/check_syntax.py
+/migrate_fotos.py
+/restore_backup.py
+/fix_views.py
+/generate_pwa_icons.py
+/diagnostico_fotos.py
+/comparar_com_github.py
+/comparar.bat
+/comparar_vps.sh
+/limpar_vps.sh
+/configure-vscode.ps1
+/setup-ssh.bat
+/setup-ssh.ps1
+
+# Backups de banco/pastas
+backups/
+db.sqlite3.backup*
+*.save
+gestcaptur/media/
+/views.txt

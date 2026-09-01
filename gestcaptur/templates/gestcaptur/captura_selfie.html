@@ -1,0 +1,353 @@
+{% extends "gestcaptur/base_publico.html" %}
+{% load static %}
+
+{% block title %}Captura de Selfie - {{ evento.tipo_evento }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Página inicial - IMPORTANTE: Sem fullscreen, apenas conteúdo visível */
+    html, body {
+        width: 100%;
+        height: auto;
+        overflow: auto;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    /* PROTEÇÃO: Remover qualquer vídeo fora do modal */
+    video {
+        display: none !important;
+        visibility: hidden !important;
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    .modal video,
+    #cameraModal video,
+    #camera-area video {
+        display: block !important;
+        visibility: visible !important;
+        position: relative;
+        top: auto;
+        left: auto;
+    }
+
+    /* Forçar modal em portrait VERTICAL */
+    .modal-dialog.modal-fullscreen {
+        width: 90vmin !important;
+        height: 160vmin !important;
+        max-width: 450px !important;
+        max-height: 100vh !important;
+        aspect-ratio: 9 / 16 !important;
+        margin: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .modal-dialog.modal-fullscreen .modal-content {
+        width: 100% !important;
+        height: 100% !important;
+        aspect-ratio: 9 / 16 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .modal-body {
+        flex: 1 !important;
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 20px !important;
+        background: #f8f9fa !important;
+    }
+
+    .selfie-wrapper {
+        width: 100vw;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        color: white;
+    }
+
+    .selfie-content {
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+    }
+
+    .selfie-title h1 {
+        font-size: clamp(28px, 8vw, 36px);
+        font-weight: 700;
+        margin-bottom: 8px;
+        line-height: 1.2;
+    }
+
+    .selfie-title p {
+        font-size: clamp(16px, 5vw, 20px);
+        opacity: 0.95;
+        margin-bottom: 20px;
+    }
+
+    .selfie-instructions {
+        background: rgba(255, 255, 255, 0.15);
+        border-left: 4px solid #ffc107;
+        padding: 16px;
+        border-radius: 10px;
+        margin-bottom: 30px;
+        font-size: clamp(15px, 4.5vw, 17px);
+        line-height: 1.7;
+        backdrop-filter: blur(10px);
+    }
+
+    .selfie-instructions h3 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: clamp(17px, 5vw, 20px);
+        color: #ffc107;
+    }
+
+    .selfie-instructions ul {
+        margin: 12px 0;
+        padding-left: 24px;
+        text-align: left;
+    }
+
+    .selfie-instructions li {
+        margin: 8px 0;
+    }
+
+    .btn-iniciar {
+        background: #ffc107;
+        color: #333;
+        border: none;
+        padding: 16px 32px;
+        font-size: clamp(16px, 4.5vw, 18px);
+        font-weight: 700;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+        width: 100%;
+        max-width: 300px;
+    }
+
+    .btn-iniciar:active {
+        background: #ffb300;
+        transform: scale(0.98);
+    }
+
+    .evento-info {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 20px;
+        font-size: clamp(13px, 4vw, 15px);
+    }
+
+    .evento-info strong {
+        color: #ffc107;
+    }
+
+    /* Modal - Fullscreen quando aberto */
+    .modal.fade {
+        display: none;
+    }
+
+    .modal.show {
+        display: block;
+    }
+
+    .modal-dialog.modal-fullscreen {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        margin: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        aspect-ratio: 9 / 16 !important;
+    }
+
+    .modal-content {
+        height: 100%;
+        border-radius: 0;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .modal-header {
+        flex-shrink: 0;
+        border: none !important;
+        padding: 16px 20px !important;
+    }
+
+    .modal-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        overflow-y: auto;
+    }
+
+    .modal-footer {
+        flex-shrink: 0;
+        border: none !important;
+        padding: 16px 20px !important;
+    }
+
+    #camera-area {
+        /* Manter propor\u00e7\u00e3o 3:4 (portrait) */
+        aspect-ratio: 3 / 4;
+        width: 100%;
+        max-width: 450px;
+        max-height: 600px;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    #camera-area {
+        /* Manter proporção 3:4 (portrait) */
+        aspect-ratio: 3 / 4 !important;
+        width: 100% !important;
+        max-width: 450px !important;
+        max-height: 600px !important;
+        background: #000 !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        margin-bottom: 20px !important;
+    }
+
+    #camera-area video,
+    #camera-area img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        display: block !important;
+        aspect-ratio: 3 / 4 !important;
+    }
+
+    @media (max-width: 576px) {
+        .selfie-wrapper {
+            padding: 15px;
+            min-height: auto;
+        }
+        
+        .selfie-instructions {
+            padding: 14px;
+            margin-bottom: 20px;
+        }
+
+        .btn-iniciar {
+            padding: 14px 24px;
+        }
+
+        #camera-area {
+            max-width: 100%;
+            max-height: 60vh;
+        }
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="selfie-wrapper">
+    <div class="selfie-content">
+        <!-- Header -->
+        <div class="selfie-title">
+            <h1>📸 Capture sua Selfie</h1>
+            <p>Identificação para o evento</p>
+        </div>
+
+        <!-- Info do evento -->
+        {% if evento %}
+        <div class="evento-info">
+            <strong>{{ evento.tipo_evento }}</strong><br>
+            <small>{{ evento.data|date:"d/m/Y" }} • {{ evento.local }}</small>
+        </div>
+        {% endif %}
+
+        <!-- Instruções -->
+        <div class="selfie-instructions">
+            <h3>✅ Como fazer uma boa selfie:</h3>
+            <ul>
+                <li>📷 <strong>Boa iluminação:</strong> Use iluminação frontal, evite sombras no rosto</li>
+                <li>😊 <strong>Rosto centralizado:</strong> Posicione seu rosto no centro da câmera</li>
+                <li>👀 <strong>Olhe para a câmera:</strong> Mantenha contato visual direto</li>
+                <li>🚫 <strong>Sem óculos de sol:</strong> O rosto deve ser claramente visível</li>
+                <li>⚠️ <strong>Qualidade mínima:</strong> A câmera será ajustada automaticamente</li>
+            </ul>
+        </div>
+
+        <!-- Botão para iniciar -->
+        <button class="btn-iniciar" data-bs-toggle="modal" data-bs-target="#cameraModal" data-evento-id="{{ evento.id }}">
+            📸 Iniciar Captura
+        </button>
+    </div>
+</div>
+
+<!-- Modal Câmera -->
+<div class="modal fade" id="cameraModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-fullscreen" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+        <div class="modal-content" style="background: transparent; border: none;">
+            <div class="modal-header" style="border: none; padding: 20px;">
+                <h5 class="modal-title" style="color: white; font-size: clamp(18px, 5vw, 22px); font-weight: 700;">
+                    📸 Capturar Selfie
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1;">
+                <!-- Área da câmera -->
+                <div id="camera-area" style="width: 100%; max-width: 450px; margin-bottom: 20px;">
+                    <!-- Será preenchido pelo JS -->
+                </div>
+
+                <!-- Instruções em tempo real -->
+                <div id="camera-status" role="status" aria-live="polite" style="font-size: clamp(14px, 4vw, 16px); text-align: center; margin-bottom: 20px; min-height: 30px;">
+                    📷 Inicializando câmera...
+                </div>
+            </div>
+
+            <div class="modal-footer" style="border: none; padding: 20px; gap: 10px; justify-content: center;">
+                <button type="button" class="btn btn-secondary btn-lg" id="btn-capturar-modal">
+                    📸 Capturar
+                </button>
+                <button type="button" class="btn btn-warning btn-lg" id="btn-refazer-modal" style="display: none;">
+                    🔄 Recapturar
+                </button>
+                <button type="button" class="btn btn-success btn-lg" id="btn-confirmar-modal" style="display: none;">
+                    ✅ Confirmar e Continuar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'gestcaptur/js/captura_selfie_modal.js' %}"></script>
+{% endblock %}

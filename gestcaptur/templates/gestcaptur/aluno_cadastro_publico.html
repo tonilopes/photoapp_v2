@@ -1,0 +1,1049 @@
+{# gestcaptur/templates/gestcaptur/aluno_cadastro_publico.html #}
+{% extends 'gestcaptur/base_publico.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Cadastro do Aluno{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+    
+    body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+    }
+    
+    .required-field {
+        color: #dc3545;
+        font-weight: bold;
+    }
+    .form-section {
+        background: #f8f9fa;
+        padding: 1.2rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1.2rem;
+        border-left: 4px solid #007bff;
+    }
+    .form-section h4 {
+        color: #007bff;
+        margin-bottom: 1rem;
+        font-size: clamp(16px, 4vw, 18px);
+    }
+    .invalid-feedback {
+        display: block;
+        font-size: clamp(12px, 3vw, 14px);
+    }
+    
+    .form-label {
+        font-size: clamp(13px, 3.5vw, 15px);
+        font-weight: 500;
+    }
+    
+    .form-control {
+        font-size: clamp(14px, 4vw, 16px);
+        padding: 0.6rem 0.75rem;
+    }
+    
+    .btn {
+        font-size: clamp(14px, 4vw, 16px);
+        padding: 0.6rem 1rem;
+    }
+    
+    @media (max-width: 576px) {
+        .form-section {
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3 px-2" style="max-width: 100%; margin: 0; padding: 0;">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-11 col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0" style="font-size: clamp(18px, 5vw, 24px);">📋 Ficha de Cadastro do Aluno</h3>
+                </div>
+                <div class="card-body" style="padding: 1rem;">
+                    {% if aluno %}
+                        <div class="alert alert-info" style="font-size: clamp(14px, 4vw, 16px);">
+                            <strong>Editando:</strong> {{ aluno.nome }}
+                        </div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {# Campos auxiliares para JS de validação em tempo real #}
+                        <input type="hidden" id="campo-evento-id" value="{{ evento.id|default:'' }}">
+                        <input type="hidden" id="campo-aluno-id" value="{{ aluno.id|default:'' }}">
+                        
+                        {% if request.GET.evento %}
+                            <input type="hidden" name="evento_id" value="{{ request.GET.evento }}">
+                        {% endif %}
+
+
+
+                        <!-- Mensagens de erro se não colocar um dos campos obrigatórios -->
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{% if 'error' in message.tags %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <strong>{{ message }}</strong>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        {% if erro_campos_minimos %}
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Campos obrigatórios não preenchidos!</strong><br>
+                                Para salvar o cadastro, você deve preencher: 
+                                <strong>{{ campos_obrigatorios_faltando|join:", " }}</strong>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endif %}
+
+                        <div id="msgCamposObrigatorios" class="alert alert-danger text-center" style="display:none;">
+                            Insira os campos obrigatórios.
+                        </div>
+
+                        <!-- SELFIE CAPTURADA -->
+                        {% if aluno.foto %}
+                        <div class="form-section bg-success bg-opacity-10 border-success">
+                            <div class="row align-items-center">
+                                <div class="col-md-3 text-center">
+                                    <img src="{{ aluno.foto.url }}" alt="Selfie" class="img-thumbnail rounded-circle" style="max-width: 120px; height: 120px; object-fit: cover;">
+                                </div>
+                                <div class="col-md-9">
+                                    <h5 class="text-success">✅ Selfie Capturada</h5>
+                                    <p class="mb-0 text-muted">Sua foto de identificação foi capturada com sucesso. Pode prosseguir com o cadastro.</p>
+                                    <small class="text-muted">Clique <a href="{% url 'captura_selfie_publico' evento.id aluno.id %}">aqui</a> para recapturar se necessário.</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- DADOS PESSOAIS -->
+                        <div class="form-section">
+                            <h4>👤 Dados Pessoais</h4>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="{{ form.nome.id_for_label }}" class="form-label">
+                                            {{ form.nome.label }}<span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.nome }}
+                                        {% if form.nome.errors %}
+                                            <div class="invalid-feedback">{{ form.nome.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="{{ form.cpf.id_for_label }}" class="form-label">
+                                            {{ form.cpf.label }}
+                                        </label>
+                                        {{ form.cpf }}
+                                        {% if form.cpf.errors %}
+                                            <div class="invalid-feedback">{{ form.cpf.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.data_nascimento.id_for_label }}" class="form-label">
+                                            {{ form.data_nascimento.label }}
+                                        </label>
+                                        {{ form.data_nascimento }}
+                                        {% if form.data_nascimento.errors %}
+                                            <div class="invalid-feedback">{{ form.data_nascimento.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.email.id_for_label }}" class="form-label">
+                                            {{ form.email.label }}
+                                        </label>
+                                        {{ form.email }}
+                                        {% if form.email.errors %}
+                                            <div class="invalid-feedback">{{ form.email.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ENDEREÇO -->
+                        <div class="form-section">
+                            <h4>🏠 Endereço</h4>
+                            <div class="row">
+                                <div class="col-md-6">
+
+                                    <div class="mb-3">
+                                        <label for="{{ form.cep.id_for_label }}" class="form-label">
+                                            {{ form.cep.label }}
+                                        </label>
+                                        <div class="input-group">
+                                            {{ form.cep }}
+                                            <button class="btn btn-outline-secondary" type="button" id="btnBuscarCep">
+                                                <i class="bi bi-search"></i> Pesquisar
+                                            </button>
+                                        </div>
+                                        {% if form.cep.errors %}
+                                            <div class="invalid-feedback">{{ form.cep.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+
+                                </div>
+
+                                <div class="col-md-7">
+                                    <div class="mb-3">
+                                        <label for="{{ form.endereco.id_for_label }}" class="form-label">
+                                            {{ form.endereco.label }}
+                                        </label>
+                                        {{ form.endereco }}
+                                        {% if form.endereco.errors %}
+                                            <div class="invalid-feedback">{{ form.endereco.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label for="{{ form.numero.id_for_label }}" class="form-label">
+                                            {{ form.numero.label }}
+                                        </label>
+                                        {{ form.numero }}
+                                        {% if form.numero.errors %}
+                                            <div class="invalid-feedback">{{ form.numero.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="{{ form.complemento.id_for_label }}" class="form-label">
+                                            {{ form.complemento.label }}
+                                        </label>
+                                        {{ form.complemento }}
+                                        {% if form.complemento.errors %}
+                                            <div class="invalid-feedback">{{ form.complemento.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="{{ form.bairro.id_for_label }}" class="form-label">
+                                            {{ form.bairro.label }}
+                                        </label>
+                                        {{ form.bairro }}
+                                        {% if form.bairro.errors %}
+                                            <div class="invalid-feedback">{{ form.bairro.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="{{ form.cidade.id_for_label }}" class="form-label">
+                                            {{ form.cidade.label }}
+                                        </label>
+                                        {{ form.cidade }}
+                                        {% if form.cidade.errors %}
+                                            <div class="invalid-feedback">{{ form.cidade.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="{{ form.estado.id_for_label }}" class="form-label">
+                                            {{ form.estado.label }}
+                                        </label>
+                                        {{ form.estado }}
+                                        {% if form.estado.errors %}
+                                            <div class="invalid-feedback">{{ form.estado.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CONTATOS -->
+                        <div class="form-section">
+                            <h4>📞 Contatos</h4>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.telefone_fixo.id_for_label }}" class="form-label">
+                                            {{ form.telefone_fixo.label }}
+                                        </label>
+                                        {{ form.telefone_fixo }}
+                                        {% if form.telefone_fixo.errors %}
+                                            <div class="invalid-feedback">{{ form.telefone_fixo.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.whatsapp.id_for_label }}" class="form-label">
+                                            {{ form.whatsapp.label }}<span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.whatsapp }}
+                                        {% if form.whatsapp.errors %}
+                                            <div class="invalid-feedback">{{ form.whatsapp.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.instagram.id_for_label }}" class="form-label">
+                                            {{ form.instagram.label }}
+                                        </label>
+                                        {{ form.instagram }}
+                                        {% if form.instagram.errors %}
+                                            <div class="invalid-feedback">{{ form.instagram.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DADOS DOS PAIS -->
+                        <div class="form-section">
+                            <h4>👨‍👩‍👧‍👦 Dados dos Pais/Responsáveis</h4>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.nome_pai.id_for_label }}" class="form-label">
+                                            {{ form.nome_pai.label }}
+                                        </label>
+                                        {{ form.nome_pai }}
+                                        {% if form.nome_pai.errors %}
+                                            <div class="invalid-feedback">{{ form.nome_pai.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.whatsapp_pai.id_for_label }}" class="form-label">
+                                            {{ form.whatsapp_pai.label }}
+                                        </label>
+                                        {{ form.whatsapp_pai }}
+                                        {% if form.whatsapp_pai.errors %}
+                                            <div class="invalid-feedback">{{ form.whatsapp_pai.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.nome_mae.id_for_label }}" class="form-label">
+                                            {{ form.nome_mae.label }}
+                                        </label>
+                                        {{ form.nome_mae }}
+                                        {% if form.nome_mae.errors %}
+                                            <div class="invalid-feedback">{{ form.nome_mae.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.whatsapp_mae.id_for_label }}" class="form-label">
+                                            {{ form.whatsapp_mae.label }}
+                                        </label>
+                                        {{ form.whatsapp_mae }}
+                                        {% if form.whatsapp_mae.errors %}
+                                            <div class="invalid-feedback">{{ form.whatsapp_mae.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CONTATO DE PARENTE -->
+                        <div class="form-section">
+                            <h4> 👥 Contato parente</h4>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="{{ form.nome_parente.id_for_label }}" class="form-label">
+                                            {{ form.nome_parente.label }}
+                                        </label>
+                                        {{ form.nome_parente }}
+                                        {% if form.nome_parente.errors %}
+                                            <div class="invalid-feedback">{{ form.nome_parente.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="{{ form.grau_parentesco.id_for_label }}" class="form-label">
+                                            {{ form.grau_parentesco.label }}
+                                        </label>
+                                        {{ form.grau_parentesco }}
+                                        {% if form.grau_parentesco.errors %}
+                                            <div class="invalid-feedback">{{ form.grau_parentesco.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="{{ form.whatsapp_parente.id_for_label }}" class="form-label">
+                                            {{ form.whatsapp_parente.label }}
+                                        </label>
+                                        {{ form.whatsapp_parente }}
+                                        {% if form.whatsapp_parente.errors %}
+                                            <div class="invalid-feedback">{{ form.whatsapp_parente.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                💾 Salvar Cadastro
+                            </button>
+                        </div>
+
+                        <!-- Modal de Erros de Validação -->
+                        <div class="modal fade" id="errosModal" tabindex="-1" aria-labelledby="errosModalLabel" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title" id="errosModalLabel">Campos obrigatórios não preenchidos</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <ul id="listaErros">
+                                {% for message in messages %}
+                                    <li>{{ message }}</li>
+                                {% endfor %}
+                                </ul>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
+                            </div>
+                        </div>
+                        </div>                        
+
+                    </form>
+
+                    {% if mostrar_modal_parcial and link_continuacao %}
+                    <div class="alert alert-warning" style="margin-top:20px;">
+                        <h4>Cadastro incompleto!</h4>
+                        <p>Você não preencheu todos os campos obrigatórios.</p>
+                        <p><strong>Campos faltando (verifique marcação com *):</strong> {{ campos_faltando|join:", " }}</p>
+                        <p>
+                            <strong>Salve este link para continuar depois:</strong><br>
+                            <div class="input-group mb-2">
+                                <input id="linkCadastro" type="text" value="{{ link_continuacao }}" readonly style="width:100%;font-size:1.1em;" onclick="this.select();">
+                                <button class="btn btn-outline-primary" type="button" onclick="copiarLinkCadastro()">Copiar link</button>
+                            </div>
+                            <span id="copiadoMsg" style="display:none;color:green;">Link copiado!</span>
+                        </p>
+                        <p>Copie e salve este link nos favoritos ou envie para você mesmo. Você poderá finalizar o cadastro depois.</p>
+                    </div>
+                    <script>
+                    function copiarLinkCadastro() {
+                        var input = document.getElementById("linkCadastro");
+                        input.select();
+                        input.setSelectionRange(0, 99999); // Para mobile
+                        document.execCommand("copy");
+                        document.getElementById("copiadoMsg").style.display = "inline";
+                        setTimeout(function() {
+                            document.getElementById("copiadoMsg").style.display = "none";
+                        }, 2000);
+                    }
+                    </script>
+                    {% endif %}
+
+                    {% if mostrar_modal_parcial and campos_vazios_nomes %}
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            mostrarCamposObrigatorios({{ campos_vazios_nomes|safe }});
+                        });
+                    </script>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Modal de Confirmação de Cadastro Parcial -->
+{% if mostrar_confirmacao_parcial %}
+<div class="modal fade show" id="modalConfirmacaoParcial" tabindex="-1" style="display: block; background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Cadastro Incompleto
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong><i class="fas fa-info-circle"></i> Atenção!</strong><br>
+                    {{ mensagem_confirmacao }}
+                </div>
+                
+                <div class="mb-3">
+                    <strong>Campos faltando:</strong>
+                    <ul class="list-unstyled mt-2">
+                        {% for campo in campos_faltando %}
+                        <li><i class="fas fa-times text-danger"></i> {{ campo }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb"></i> 
+                    <strong>Você pode:</strong><br>
+                    • Salvar agora e completar depois<br>
+                    • Ou voltar e preencher os campos faltando
+                </div>
+            </div>
+            <div class="modal-footer">
+                <form method="post" style="display: inline;">
+                    {% csrf_token %}
+                    
+                    <!-- Manter todos os dados preenchidos -->
+                    {% for key, value in dados_form.items %}
+                        {% if key != 'csrfmiddlewaretoken' %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <!-- Campo de confirmação -->
+                    <input type="hidden" name="confirmar_parcial" value="true">
+                    
+                    <button type="button" class="btn btn-secondary" onclick="history.back()">
+                        <i class="fas fa-arrow-left"></i> Voltar e Completar
+                    </button>
+                    
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save"></i> Salvar Incompleto
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal de CPF Duplicado -->
+{% if cpf_duplicado %}
+<div class="modal fade show" id="modalCpfDuplicado" tabindex="-1" style="display: block; background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-check"></i> Cadastro Existente
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong><i class="fas fa-check-circle"></i> CPF Encontrado!</strong><br>
+                    Já existe um cadastro com este CPF para <strong>{{ aluno_existente_nome }}</strong>.
+                </div>
+                
+                <div class="alert alert-light border-info">
+                    <p class="mb-0">
+                        <i class="fas fa-question-circle text-info"></i>
+                        <strong>O que você deseja fazer?</strong>
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <a href="{% url 'aluno_cadastro_publico_editar' aluno_existente_id aluno_existente_token %}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Atualizar Dados
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-mostrar modal de CPF duplicado
+const modalCpfDuplicado = new bootstrap.Modal(document.getElementById('modalCpfDuplicado'));
+modalCpfDuplicado.show();
+</script>
+{% endif %}
+{% if cadastro_parcial_salvo %}
+<div class="modal fade show" id="modalSucessoParcial" tabindex="-1" style="display: block; background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-check-circle"></i> Cadastro Salvo!
+                </h5>
+            </div>
+            <div class="modal-body text-center">
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-user"></i> {{ aluno.nome }}</h6>
+                    {{ mensagem_sucesso }}
+                </div>
+                
+                <div class="mb-3">
+                    <strong>Campos ainda necessários:</strong>
+                    <div class="mt-2">
+                        {% for campo in campos_faltando %}
+                        <span class="badge bg-warning text-dark me-1">{{ campo }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong><i class="fas fa-link"></i> Link para completar:</strong><br>
+                    <div class="input-group mt-2">
+                        <input type="text" class="form-control" id="linkContinuacao" value="{{ link_continuacao }}" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copiarLinkModal()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" onclick="fecharModal()">
+                    <i class="fas fa-check"></i> Entendi
+                </button>
+                <a href="{{ link_continuacao }}" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Completar Agora
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- CARREGAR JQUERY PRIMEIRO -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- DEPOIS CARREGAR O PLUGIN DE MÁSCARAS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
+
+<script>
+// Função para fechar modal de forma segura
+function fecharModal() {
+    // Tentar fechar a janela se foi aberta por script
+    try {
+        window.close();
+    } catch (e) {
+        // Se não conseguir fechar, redirecionar ou ocultar modal
+        console.log('Não é possível fechar a janela automaticamente');
+        
+        // Opção 1: Ocultar o modal
+        const modal = document.getElementById('modalSucessoParcial');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        
+        // Opção 2: Redirecionar para página inicial (opcional)
+        // window.location.href = '/';
+        
+        // Opção 3: Mostrar mensagem
+        alert('Cadastro salvo! Você pode fechar esta aba manualmente.');
+    }
+}
+
+function copiarLinkModal() {
+    const linkElement = document.getElementById('linkContinuacao');
+    if (!linkElement) {
+        console.error('Elemento linkContinuacao não encontrado');
+        return;
+    }
+    
+    const linkValue = linkElement.value;
+    console.log('Tentando copiar:', linkValue);
+    
+    // Selecionar o texto
+    linkElement.select();
+    linkElement.setSelectionRange(0, 99999);
+    
+    // Tentar método moderno primeiro
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(linkValue).then(() => {
+            console.log('✅ Link copiado via clipboard API');
+            mostrarMensagemCopia('Link copiado!');
+        }).catch((err) => {
+            console.log('❌ Erro clipboard API:', err);
+            // Fallback para método antigo
+            tentarCopiaLegacy(linkValue);
+        });
+    } else {
+        console.log('📋 Usando método legacy');
+        tentarCopiaLegacy(linkValue);
+    }
+}
+
+// Função auxiliar para cópia legacy
+function tentarCopiaLegacy(texto) {
+    try {
+        const textArea = document.createElement('textarea');
+        textArea.value = texto;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+            console.log('✅ Link copiado via execCommand');
+            mostrarMensagemCopia('Link copiado!');
+        } else {
+            console.log('❌ Falha no execCommand');
+            mostrarMensagemCopia('Erro ao copiar. Selecione e copie manualmente.', 'error');
+        }
+    } catch (err) {
+        console.error('❌ Erro na cópia legacy:', err);
+        mostrarMensagemCopia('Erro ao copiar. Selecione e copie manualmente.', 'error');
+    }
+}
+
+// Função para mostrar mensagem de cópia
+function mostrarMensagemCopia(mensagem, tipo = 'success') {
+    // Criar elemento de notificação
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 10px 20px;
+        background: ${tipo === 'success' ? '#28a745' : '#dc3545'};
+        color: white;
+        border-radius: 5px;
+        z-index: 9999;
+        font-weight: bold;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    `;
+    notification.textContent = mensagem;
+    
+    document.body.appendChild(notification);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 3000);
+}
+</script>
+
+<script>
+// Aguardar jQuery carregar completamente
+$(document).ready(function() {
+    console.log('✅ jQuery carregado:', typeof $ !== 'undefined');
+    console.log('✅ jQuery Mask carregado:', typeof $.fn.mask !== 'undefined');
+    
+    // APLICAR MÁSCARAS DIRETAMENTE NOS IDs DOS CAMPOS
+    $('#id_cpf').mask('000.000.000-00');
+    $('#id_cep').mask('00000-000');
+    $('#id_telefone_fixo').mask('(00) 0000-0000');
+    $('#id_whatsapp').mask('(00) 00000-0000');
+    $('#id_whatsapp_pai').mask('(00) 00000-0000');
+    $('#id_whatsapp_mae').mask('(00) 00000-0000');
+    $('#id_whatsapp_parente').mask('(00) 00000-0000');
+    $('#id_data_nascimento').mask('00/00/0000');
+    
+    console.log('✅ Máscaras aplicadas');
+    
+    // 🔤 TRANSFORMAR NOMES PARA MAIÚSCULAS EM TEMPO REAL
+    // Campos de nome que devem ser convertidos para caixa alta
+    const camposNome = ['#id_nome', '#id_nome_pai', '#id_nome_mae', '#id_nome_parente'];
+    
+    camposNome.forEach(selector => {
+        $(selector).on('input', function() {
+            // Transformar conteúdo em MAIÚSCULAS enquanto digita
+            const valorAtual = $(this).val();
+            const valorMaiusculo = valorAtual.toUpperCase();
+            if (valorAtual !== valorMaiusculo) {
+                $(this).val(valorMaiusculo);
+                // Mover cursor para o final
+                this.setSelectionRange(valorMaiusculo.length, valorMaiusculo.length);
+            }
+        });
+    });
+    
+    console.log('✅ Transformação MAIÚSCULAS ativada para nomes');
+    
+    
+    // LIMITAÇÃO RÍGIDA - IMPEDIR DIGITAÇÃO ALÉM DO LIMITE
+    $('#id_telefone_fixo').on('keypress', function(e) {
+        const value = $(this).val().replace(/\D/g, '');
+        if (value.length >= 10 && e.which >= 48 && e.which <= 57) {
+            e.preventDefault();
+            console.log('🚫 Telefone limitado a 10 dígitos');
+            return false;
+        }
+    });
+    
+    $('#id_whatsapp, #id_whatsapp_pai, #id_whatsapp_mae, #id_whatsapp_parente').on('keypress', function(e) {
+        const value = $(this).val().replace(/\D/g, '');
+        if (value.length >= 11 && e.which >= 48 && e.which <= 57) {
+            e.preventDefault();
+            console.log('🚫 WhatsApp limitado a 11 dígitos');
+            return false;
+        }
+    });
+    
+    $('#id_cpf').on('keypress', function(e) {
+        const value = $(this).val().replace(/\D/g, '');
+        if (value.length >= 11 && e.which >= 48 && e.which <= 57) {
+            e.preventDefault();
+            console.log('🚫 CPF limitado a 11 dígitos');
+            return false;
+        }
+    });
+    
+    // VALIDAÇÃO DE CPF EM TEMPO REAL (formato + duplicidade no evento)
+    $('#id_cpf').on('input', function() {
+        const cpf = $(this).val().replace(/\D/g, '');
+
+        // Remove validações anteriores
+        $(this).removeClass('is-invalid is-valid');
+        $(this).siblings('.invalid-feedback').remove();
+
+        if (cpf.length === 11) {
+            if (validarCPF(cpf)) {
+                $(this).addClass('is-valid');
+            } else {
+                $(this).addClass('is-invalid');
+                $(this).after('<div class="invalid-feedback">CPF inválido. Verifique os números.</div>');
+            }
+        }
+    });
+
+    // VERIFICAÇÃO DE CPF DUPLICADO NO EVENTO (ao sair do campo)
+    $('#id_cpf').on('blur', function() {
+        const $field = $(this);
+        const cpf = $field.val().replace(/\D/g, '');
+
+        // Só verifica se CPF tem 11 dígitos e é válido
+        if (cpf.length !== 11 || !validarCPF(cpf)) return;
+
+        const eventoId = $('#campo-evento-id').val() || '';
+        const alunoId = $('#campo-aluno-id').val() || '';
+        const csrfToken = $('[name=csrfmiddlewaretoken]').val();
+
+        if (!eventoId) return;  // sem evento não verifica
+
+        $.ajax({
+            url: '/api/verificar-cpf/',
+            method: 'POST',
+            data: { cpf: cpf, evento_id: eventoId, aluno_id: alunoId, csrfmiddlewaretoken: csrfToken },
+            success: function(resp) {
+                $field.siblings('.invalid-feedback').remove();
+                $field.removeClass('is-invalid is-valid');
+                if (resp.exists) {
+                    $field.addClass('is-invalid');
+                    $field.after('<div class="invalid-feedback">CPF já cadastrado neste evento. Insira outro ou fale com nossa equipe.</div>');
+                } else {
+                    $field.addClass('is-valid');
+                }
+            },
+            error: function() {
+                // silencioso — o servidor validará no submit
+            }
+        });
+    });
+
+    // VERIFICAÇÃO DE WHATSAPP DUPLICADO (ao sair de qualquer campo WhatsApp)
+    const whatsappFields = ['#id_whatsapp', '#id_whatsapp_pai', '#id_whatsapp_mae', '#id_whatsapp_parente'];
+
+    $(whatsappFields.join(',')).on('blur', function() {
+        const $atual = $(this);
+        const valorAtual = $atual.val().replace(/\D/g, '');
+
+        // Limpar erro anterior neste campo
+        $atual.siblings('.invalid-feedback').remove();
+        $atual.removeClass('is-invalid');
+
+        if (!valorAtual || valorAtual.length < 11) return;
+
+        // Coletar valores dos outros campos WhatsApp preenchidos
+        let duplicado = false;
+        whatsappFields.forEach(function(sel) {
+            if (sel === '#' + $atual.attr('id')) return;  // pular o próprio campo
+            const outro = $(sel).val().replace(/\D/g, '');
+            if (outro && outro === valorAtual) {
+                duplicado = true;
+            }
+        });
+
+        if (duplicado) {
+            $atual.addClass('is-invalid');
+            $atual.siblings('.invalid-feedback').remove();
+            $atual.after('<div class="invalid-feedback">Número já informado em outro campo WhatsApp. Use números diferentes.</div>');
+        }
+    });
+    
+    // VALIDAÇÃO DE DATA EM TEMPO REAL
+    $('#id_data_nascimento').on('input', function() {
+        const data = $(this).val();
+        
+        // Remove validações anteriores
+        $(this).removeClass('is-invalid is-valid');
+        $(this).siblings('.invalid-feedback').remove();
+        
+        if (data.length === 10) {
+            if (validarDataNascimento(data)) {
+                $(this).addClass('is-valid');
+                console.log('✅ Data válida:', data);
+            } else {
+                $(this).addClass('is-invalid');
+                $(this).after('<div class="invalid-feedback">Data inválida</div>');
+                console.log('❌ Data inválida:', data);
+            }
+        }
+    });
+    
+    // BUSCAR CEP AUTOMATICAMENTE
+    $('#id_cep').on('input', function() {
+        const cep = $(this).val().replace(/\D/g, '');
+        if (cep.length === 8) {
+            buscarCEP(cep);
+        }
+    });
+    
+    // BOTÃO BUSCAR CEP
+    $('#btnBuscarCep').on('click', function() {
+        const cep = $('#id_cep').val().replace(/\D/g, '');
+        if (cep.length === 8) {
+            buscarCEP(cep);
+        } else {
+            alert('Digite um CEP válido com 8 dígitos');
+        }
+    });
+});
+
+function validarCPF(cpf) {
+    // Verifica se tem 11 dígitos
+    if (cpf.length !== 11) return false;
+    
+    // Verifica se todos os dígitos são iguais
+    if (/^(\d)\1{10}$/.test(cpf)) return false;
+    
+    // Calcula primeiro dígito verificador
+    let soma = 0;
+    for (let i = 0; i < 9; i++) {
+        soma += parseInt(cpf.charAt(i)) * (10 - i);
+    }
+    let resto = soma % 11;
+    let digito1 = resto < 2 ? 0 : 11 - resto;
+    
+    // Calcula segundo dígito verificador
+    soma = 0;
+    for (let i = 0; i < 10; i++) {
+        soma += parseInt(cpf.charAt(i)) * (11 - i);
+    }
+    resto = soma % 11;
+    let digito2 = resto < 2 ? 0 : 11 - resto;
+    
+    // Verifica se os dígitos calculados conferem
+    return parseInt(cpf.charAt(9)) === digito1 && parseInt(cpf.charAt(10)) === digito2;
+}
+
+function validarDataNascimento(data) {
+    // Formato: DD/MM/AAAA
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = data.match(regex);
+    
+    if (!match) return false;
+    
+    const dia = parseInt(match[1]);
+    const mes = parseInt(match[2]);
+    const ano = parseInt(match[3]);
+    
+    // Verificações de range
+    if (dia < 1 || dia > 31) return false;
+    if (mes < 1 || mes > 12) return false;
+    if (ano < 1900 || ano > 2050) return false;
+    
+    // Verificar se a data é válida
+    const dataObj = new Date(ano, mes - 1, dia);
+    return dataObj.getDate() === dia && 
+           dataObj.getMonth() === mes - 1 && 
+           dataObj.getFullYear() === ano;
+}
+
+function buscarCEP(cep) {
+    console.log('🔍 Buscando CEP:', cep);
+    
+    fetch(`https://viacep.com.br/ws/${cep}/json/`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.erro) {
+                $('#id_endereco').val(data.logradouro);
+                $('#id_bairro').val(data.bairro);
+                $('#id_cidade').val(data.localidade);
+                $('#id_estado').val(data.uf);
+                
+                $('#id_cep').addClass('is-valid');
+                setTimeout(() => $('#id_cep').removeClass('is-valid'), 2000);
+                console.log('✅ CEP encontrado:', data);
+            } else {
+                alert('CEP não encontrado');
+            }
+        })
+        .catch(error => {
+            console.log('❌ Erro ao buscar CEP:', error);
+            alert('Erro ao buscar CEP. Tente novamente.');
+        });
+}
+
+function mostrarCamposObrigatorios(campos) {
+    document.querySelectorAll('.is-invalid').forEach(function(el) {
+        el.classList.remove('is-invalid');
+    });
+
+    campos.forEach(function(nome) {
+        var input = document.querySelector('[name="' + nome + '"]');
+        if (input) input.classList.add('is-invalid');
+    });
+
+    var msg = document.getElementById('msgCamposObrigatorios');
+    if (msg) {
+        msg.style.display = 'block';
+        setTimeout(function() {
+            msg.style.display = 'none';
+        }, 2000);
+    }
+}
+</script>
+
+
+
+
+
+{% endblock %}

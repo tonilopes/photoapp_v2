@@ -1,0 +1,130 @@
+<!-- gestcaptur/templates/gestcaptur/base_coordenador.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Coordenador{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">   
+
+    <!-- PWA (somente uso interno) -->
+    <link rel="manifest" href="{% static 'gestcaptur/manifest.json' %}">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="{% static 'gestcaptur/images/icons/icon-180.png' %}">
+
+    {% if messages %}
+    <script>
+      setTimeout(function() {
+        document.querySelectorAll('.alert, .django-message').forEach(function(el) {
+          el.style.transition = "opacity 0.5s";
+          el.style.opacity = 0;
+          setTimeout(function(){ el.remove(); }, 500);
+        });
+      }, 5000);
+    </script>
+    {% endif %}
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+    <!-- Logo -->
+    <a class="navbar-brand" href="{% url 'dashboard_coordenador' %}">
+      <img src="{% static 'gestcaptur/images/logo.png' %}" alt="Logo" width="32" height="32" class="d-inline-block align-text-top">
+      Coordenador
+    </a>
+    <!-- Toggler/collapse Button -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCoordenador" aria-controls="navbarCoordenador" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <!-- Navbar links -->
+
+    {% if request.user.role == 'coordenador' %}
+        {% load custom_tags %}
+        {% if request.user|tem_eventos_hibridos %}
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'dashboard_coordenador_fotografo' %}">
+                    <i class="bi bi-star-fill"></i> Dashboard Híbrido
+                    <span class="badge bg-warning ms-1">{{ request.user|count_eventos_hibridos }}</span>
+                </a>
+            </li>
+        {% endif %}
+    {% endif %}
+
+    <div class="collapse navbar-collapse" id="navbarCoordenador">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'dashboard_coordenador' %}">
+            <i class="bi bi-speedometer2"></i> Dashboard
+          </a>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="dropdownEventos" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-calendar-event"></i> Eventos
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="dropdownEventos">
+            <li><a class="dropdown-item" href="{% url 'dashboard_coordenador' %}">
+              <i class="bi bi-grid-3x3-gap"></i> Dashboard
+            </a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="#">
+              <i class="bi bi-play-circle"></i> Iniciar Eventos
+            </a></li>
+            <li><a class="dropdown-item" href="#">
+              <i class="bi bi-stop-circle"></i> Finalizar Eventos
+            </a></li>
+          </ul>
+        </li>
+      </ul>
+      <span class="navbar-text text-white me-3">
+        <i class="bi bi-person-circle"></i> Olá, {{ request.user.first_name }} ({{ request.user.get_role_display }})
+      </span>
+      <a href="{% url 'logout' %}" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-box-arrow-right"></i> Sair
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid py-4">
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
+</body>
+
+<style>
+  table.table {
+    font-size: 0.95rem;
+    color: #222;
+  }
+  
+  /* Responsividade global */
+  @media (max-width: 768px) {
+    .container-fluid {
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+    }
+    
+    .navbar-brand {
+      font-size: 1rem;
+    }
+    
+    .navbar-text {
+      font-size: 0.875rem;
+    }
+  }
+</style>
+</html>

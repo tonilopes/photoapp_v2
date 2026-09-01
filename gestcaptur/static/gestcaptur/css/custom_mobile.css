@@ -1,0 +1,111 @@
+/* static/gestcaptur/css/custom_mobile.css */
+
+/* 1. Usar o máximo da tela do smartphone sempre na vertical */
+/* Garante que o html e body ocupem a altura total e evita scroll horizontal */
+html, body {
+    height: 100%;
+    overflow-x: hidden;
+}
+
+/* Ajusta o container principal se você tiver um, para garantir layout vertical */
+/* Se estiver usando o container padrão do Bootstrap, ele já é responsivo */
+/* Se necessário, ajuste este seletor para o seu layout específico */
+/*.container { */
+/*    display: flex; */
+/*    flex-direction: column; */
+/*    min-height: 100vh; /* Garante que o container use no mínimo a altura da viewport */
+/*} */
+
+/* 2. A lista de alunos, com nomes grandes, precisa pular linha */
+/* Aplica às células <span> que contêm o nome do aluno */
+.list-group-item span {
+    word-wrap: break-word; /* Força a quebra de palavras longas */
+    white-space: normal; /* Permite que o espaço em branco seja tratado normalmente (quebra de linha) */
+    flex-grow: 1; /* Permite que o nome ocupe o espaço disponível antes dos botões */
+    margin-right: 10px; /* Espaço entre o nome e a foto/botões */
+}
+
+/* 3. e 6. Botões apenas com ícones (Ficha, Fotografar, Refazer) com tamanho razoável */
+/* Aplica a botões que contêm APENAS um ícone (e opcionalmente o texto 'R') */
+.list-group-item .btn, /* Botões na lista de alunos */
+.modal-footer .btn { /* Botões no footer do modal */
+    display: inline-flex; /* Permite alinhar verticalmente o conteúdo do botão */
+    align-items: center; /* Alinha itens (ícone, texto 'R') verticalmente */
+    justify-content: center; /* Centraliza o conteúdo horizontalmente */
+    padding: .75rem; /* Aumenta o padding para tornar o botão maior e mais fácil de clicar */
+    font-size: 1rem; /* Tamanho padrão da fonte */
+    line-height: 1; /* Altura da linha para ajudar no alinhamento vertical */
+}
+
+/* Ajuste específico para o botão Fotografar com o 'R' */
+.list-group-item .btn i + span, /* Ícone seguido por span (para o 'R') */
+.modal-footer .btn i + span {
+    margin-left: .25rem; /* Pequeno espaço entre o ícone e o 'R' */
+}
+
+/* Opcional: Tamanho fixo mínimo para botões pequenos */
+.btn-sm { /* Se você mantiver btn-sm, ajuste o padding/size para ele */
+     padding: .6rem; /* Padding maior para btn-sm */
+     min-width: 40px; /* Tamanho mínimo para toque */
+     min-height: 40px;
+     display: inline-flex; /* Garante o flexbox para btn-sm também */
+     align-items: center;
+     justify-content: center;
+}
+
+
+/* 4. e 5. Modal da captura/visualização da foto: ocupar maior área, vertical, proporção */
+/* Classe customizada para os modais de foto */
+.custom-modal-vertical {
+    max-width: none; /* Remove o limite de largura padrão do modal */
+    width: 95%; /* Ocupa 95% da largura da viewport em mobile */
+    max-height: 95vh; /* Ocupa no máximo 95% da altura da viewport */
+    margin: 2.5vh auto; /* Centraliza vertical e horizontalmente, deixando uma pequena margem */
+}
+
+/* Garante que o conteúdo do modal ocupe a altura disponível e use flexbox vertical */
+.custom-modal-vertical .modal-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Configura o corpo do modal para crescer e alinhar conteúdo */
+.custom-modal-vertical .modal-body {
+    flex-grow: 1; /* Permite que o corpo ocupe o espaço restante */
+    display: flex;
+    flex-direction: column; /* Layout vertical dentro do corpo */
+    justify-content: center; /* Centraliza verticalmente o conteúdo no body */
+    align-items: center; /* Centraliza horizontalmente o conteúdo no body */
+    overflow-y: auto; /* Adiciona scroll se o conteúdo vertical exceder o espaço */
+    padding: 1rem; /* Adiciona um pouco de padding interno */
+}
+
+/* Garante que a mídia (video, canvas, img) dentro do corpo do modal se ajuste */
+.custom-modal-vertical .modal-body video,
+.custom-modal-vertical .modal-body canvas,
+.custom-modal-vertical .modal-body img {
+    display: block; /* Remove espaço extra abaixo de elementos inline */
+    max-width: 100%; /* Não permite que a mídia exceda a largura do container */
+    max-height: 100%; /* Essencial para não estourar a altura do modal-body */
+    height: auto; /* Mantém a proporção da altura ao ajustar a largura */
+    object-fit: contain; /* Garante que a mídia inteira seja visível sem distorção */
+    margin: auto; /* Centraliza a mídia se ela não ocupar 100% do espaço disponível */
+    border: 1px solid #ddd; /* Opcional: Adiciona uma borda sutil */
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.2); /* Opcional: Sombra leve */
+}
+
+/* Esconde o footer se não houver botões visíveis nele (útil para o modal de visualização) */
+.custom-modal-vertical .modal-footer:empty {
+    display: none;
+}
+
+
+/* Media Query para telas maiores: Ajusta o tamanho do modal para não ser tão grande */
+@media (min-width: 768px) { /* Para tablets e desktops */
+    .custom-modal-vertical {
+        max-width: 800px; /* Limita a largura em telas maiores */
+        max-height: 90vh;
+        margin: 5vh auto; /* Ajusta a margem */
+    }
+}

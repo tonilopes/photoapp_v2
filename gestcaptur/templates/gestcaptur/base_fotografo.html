@@ -1,0 +1,465 @@
+{# gestcaptur/templates/gestcaptur/base_fotografo.html#}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- adicionado em relação ao Ubuntu -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <!-- fim adicionado em relação ao Ubuntu -->
+
+    <title>{% block title %}Photoapp{% endblock %}</title>
+    {% load static %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'gestcaptur/css/custom_mobile.css' %}"> {# Seu CSS customizado #}
+
+    <!-- PWA (somente uso interno) -->
+    <link rel="manifest" href="{% static 'gestcaptur/manifest.json' %}">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="{% static 'gestcaptur/images/icons/icon-180.png' %}">
+
+    <style>
+        /* Estilos para a lista de alunos (corrige o layout quebrado) */
+        .aluno-card {
+            background: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+            margin-bottom: 1.2rem;
+            padding: 1rem; /* Espaçamento interno */
+            display: flex; /* Habilita o layout flexbox */
+            align-items: center; /* Alinha itens verticalmente ao centro */
+            gap: 1rem; /* Espaço entre os itens (foto, detalhes, ações) */
+        }
+
+        .aluno-foto {
+            width: 40px; /* Tamanho da foto do aluno */
+            height: 40px;
+            border-radius: 50%; /* Torna a foto circular */
+            border: 2px solid #e0e0e0;
+            object-fit: cover; /* Garante que a imagem preencha sem distorcer */
+            flex-shrink: 0; /* Impede que a foto encolha em telas pequenas */
+            cursor: pointer;
+        }
+
+        .aluno-detalhes {
+            flex-grow: 1; /* Permite que os detalhes do aluno ocupem o espaço restante */
+            display: flex;
+            align-items: center; /* Alinha o nome do aluno verticalmente */
+        }
+
+        .aluno-nome {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin: 0; /* Remove margens padrão que poderiam quebrar o alinhamento */
+        }
+
+        .aluno-acoes {
+            display: flex;
+            gap: 0.5rem; /* Espaçamento entre os botões de ação */
+            flex-shrink: 0; /* Impede que os botões encolham */
+        }
+
+        /* Ajustes para botões de ação na lista de alunos */
+        .aluno-acoes .btn-app {
+            padding: 0.4rem 0.6rem;
+            font-size: 0.9rem;
+            min-width: 40px; /* Garante um tamanho mínimo para o botão */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Media queries para telas menores */
+        @media (max-width: 768px) {
+            .aluno-card {
+                padding: 0.8rem;
+                gap: 0.8rem;
+                margin-bottom: 1rem;
+            }
+            .aluno-foto {
+                width: 35px;
+                height: 35px;
+            }
+            .aluno-nome {
+                font-size: 1rem;
+            }
+            .aluno-acoes {
+                gap: 0.3rem;
+            }
+            .aluno-acoes .btn-app {
+                padding: 0.3rem 0.5rem;
+                font-size: 0.8rem;
+                min-width: 35px;
+            }
+        }
+    
+        /* 📸 MODAL COMPACTO PARA MOBILE */
+        .modal-dialog {
+            margin: 10px auto;
+            max-width: 350px;
+            width: calc(100% - 20px);
+        }
+
+        .modal-content {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .modal-body {
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        /* 📸 CONTAINER DA CÂMERA COMPACTO */
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 250px;
+            margin: 0 auto;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            aspect-ratio: 3/4;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center center;
+            display: block;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .camera-frame-34 {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 20px;
+        }
+
+        .frame-guide {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 6px 10px;
+            border-radius: 15px;
+        }
+
+        .guide-text {
+            color: white;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* �� PREVIEW COMPACTO */
+        .foto-preview {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .preview-container {
+            position: relative;
+            max-width: 250px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+
+        .preview-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+            aspect-ratio: 3/4;
+            object-fit: cover;
+        }
+
+        .preview-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            color: white;
+            padding: 12px 8px 8px;
+            text-align: center;
+        }
+
+        .preview-info small {
+            font-size: 10px;
+            opacity: 0.9;
+        }
+
+        /* 📱 MOBILE ESPECÍFICO */
+        @media (max-width: 768px) {
+            .modal-dialog {
+                margin: 5px auto;
+                max-width: 320px;
+                width: calc(100% - 10px);
+            }
+            
+            .modal-body {
+                padding: 10px;
+            }
+            
+            .camera-container,
+            .preview-container {
+                max-width: 220px;
+            }
+        }
+
+        /* 📱 MOBILE PEQUENO */
+        @media (max-width: 480px) {
+            .modal-dialog {
+                margin: 5px auto;
+                max-width: 300px;
+            }
+            
+            .camera-container,
+            .preview-container {
+                max-width: 200px;
+            }
+            
+            .modal-body {
+                padding: 8px;
+            }
+        }
+
+        /* 🎯 BOTÕES COMPACTOS */
+        #camera-modal-footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+        }
+
+        #camera-modal-footer .btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 45px;
+            font-weight: 600;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        #camera-modal-footer .btn i {
+            font-size: 16px;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 🎨 HEADER COMPACTO */
+        .modal-header {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border-bottom: none;
+            padding: 12px 15px;
+        }
+
+        .modal-header .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .modal-header .btn-close {
+            filter: invert(1);
+            font-size: 14px;
+        }
+
+        #aluno-info {
+            background: linear-gradient(135deg, rgba(0, 123, 255, 0.1), rgba(0, 123, 255, 0.05));
+            padding: 8px 10px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 3px solid #007bff;
+            font-weight: 600;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        /* 🔄 ANIMAÇÕES SUAVES */
+        .camera-container, .preview-container {
+            transition: all 0.3s ease;
+        }
+
+        .camera-frame-34 {
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        /* 📐 GARANTIR PROPORÇÃO */
+        .foto-capturada img,
+        .preview-container img {
+            aspect-ratio: 3/4 !important;
+            object-fit: cover !important;
+        }
+
+        /* 🎯 ORIENTAÇÃO LANDSCAPE (CELULAR DEITADO) */
+        @media screen and (orientation: landscape) and (max-height: 500px) {
+            .modal-dialog {
+                max-width: 280px;
+                margin: 2px auto;
+            }
+            
+            .modal-body {
+                padding: 5px;
+            }
+            
+            .camera-container,
+            .preview-container {
+                max-width: 180px;
+            }
+            
+            #camera-modal-footer {
+                padding: 8px 10px;
+            }
+            
+            #camera-modal-footer .btn {
+                min-height: 40px;
+                font-size: 13px;
+            }
+            
+            .modal-header {
+                padding: 8px 12px;
+            }
+            
+            #aluno-info {
+                padding: 6px 8px;
+                margin-bottom: 8px;
+                font-size: 13px;
+            }
+        }
+
+        /* �� MELHORIAS VISUAIS */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+
+        .modal-content {
+            border: none;
+        }
+
+        /* 📱 AJUSTE PARA TELAS MUITO PEQUENAS */
+        @media (max-width: 360px) {
+            .modal-dialog {
+                max-width: 280px;
+            }
+            
+            .camera-container,
+            .preview-container {
+                max-width: 180px;
+            }
+            
+            #camera-modal-footer .btn {
+                font-size: 13px;
+                min-height: 42px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    {# Navbar padrão do Bootstrap 5 para o collapse #}
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid"> {# container-fluid para ocupar toda a largura #}
+            <a class="navbar-brand" href="">Photoapp</a> {# <-- Verifique se 'home' é o nome da URL para a página inicial #}
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto"> {# ms-auto alinha à direita #}
+                    <li class="nav-item">
+                        {# Exibe o nome do usuário logado. Assume que request.user está disponível #}
+                        {% if request.user.is_authenticated %}
+                            <span class="nav-link text-white">Olá, {{ request.user.first_name|default:request.user.username }}! ({{ request.user.get_role_display }})</span>
+                        {% else %}
+                             {# Opcional: Algo para usuários não autenticados, embora esta base seja para fotógrafo #}
+                        {% endif %}
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'logout' %}">Sair</a> {# <-- Verifique se 'logout' é o nome da URL para sair #}
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div id="main-content"> {# Wrapper para o conteúdo principal, útil para aplicar estilos de layout se necessário #}
+        {% block content %}
+        {# O conteúdo específico de cada página vai aqui #}
+        {% endblock %}
+    </div>
+
+    <!-- CARREGAMENTO DE SCRIPTS NA ORDEM CORRETA -->
+    <!-- JQuery deve vir primeiro, antes de qualquer plugin que dependa dele -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- jQuery Mask Plugin (se estiver usando em alguma página que herda este base_fotografo) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
+
+    <!-- Bootstrap JS (Bundle inclui Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- SEU BLOCO DE SCRIPTS PERSONALIZADOS (como fotografar.js) -->
+    {% block extra_js %}{% endblock %}
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js');
+      }
+    </script>
+
+    <!-- O bloco de mensagens do Django foi movido para o final do body para não atrapalhar o carregamento dos scripts críticos -->
+    {% if messages %}
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+          document.querySelectorAll('.alert, .django-message').forEach(function(el) {
+            el.style.transition = "opacity 0.5s";
+            el.style.opacity = 0;
+            setTimeout(function(){ el.remove(); }, 500);
+          });
+        }, 5000); {# 5 segundos #}
+      });
+    </script>
+    {% endif %}
+
+</body>
+</html>

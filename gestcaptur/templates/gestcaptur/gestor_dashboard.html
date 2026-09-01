@@ -1,0 +1,265 @@
+{# gestcaptur/templates/gestcaptur/gestor_dashboard.html #}
+
+{% extends "gestcaptur/base_gestor.html" %}
+
+{% block title %}Dashboard Gestor{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-4">Dashboard do Gestor</h1>
+
+  {% if user.is_authenticated %}
+    <div class="alert alert-info" role="alert">
+      Olá, {{ user.first_name }}! Você está logado como {{ user.get_role_display }}.
+    </div>
+  {% endif %}
+
+  {% if not guias_permitidas %}
+    <div class="alert alert-warning" role="alert">
+      Seu grupo de acesso ainda não tem nenhuma guia liberada. Fale com um Gestor para liberar em Usuários &rarr; Roles e Permissões.
+    </div>
+  {% endif %}
+
+  <ul class="nav nav-tabs mb-3" id="dashboardTabs" role="tablist">
+    {% if 'grade' in guias_permitidas %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if guia_ativa == 'grade' %}active{% endif %}" id="grade-tab" data-bs-toggle="tab" data-bs-target="#grade" type="button" role="tab">📋 Grade</button>
+    </li>
+    {% endif %}
+    {% if 'andamento' in guias_permitidas %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if guia_ativa == 'andamento' %}active{% endif %}" id="andamento-tab" data-bs-toggle="tab" data-bs-target="#andamento" type="button" role="tab">🟢 Em Andamento</button>
+    </li>
+    {% endif %}
+    {% if 'finalizados' in guias_permitidas %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if guia_ativa == 'finalizados' %}active{% endif %}" id="finalizados-tab" data-bs-toggle="tab" data-bs-target="#finalizados" type="button" role="tab">Finalizados</button>
+    </li>
+    {% endif %}
+    {% if 'fichas' in guias_permitidas %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if guia_ativa == 'fichas' %}active{% endif %}" id="fichas-tab" data-bs-toggle="tab" data-bs-target="#fichas" type="button" role="tab">Fichas e Fotos</button>
+    </li>
+    {% endif %}
+    {% if 'resumo' in guias_permitidas %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if guia_ativa == 'resumo' %}active{% endif %}" id="resumo-tab" data-bs-toggle="tab" data-bs-target="#resumo" type="button" role="tab">📊 Resumo</button>
+    </li>
+    {% endif %}
+
+  </ul>
+
+  <div class="tab-content" id="dashboardTabsContent">
+    {% if 'grade' in guias_permitidas %}
+    <div class="tab-pane fade {% if guia_ativa == 'grade' %}show active{% endif %}" id="grade" role="tabpanel" aria-labelledby="grade-tab">
+      <form method="get" class="row g-2 mb-3">
+        <div class="col-md-2">
+            <input type="text" name="tipo_evento" class="form-control" placeholder="Tipo de evento" value="{{ tipo_evento|default:'' }}">
+        </div>
+        <div class="col-md-4">
+            <input type="text" name="empresa" class="form-control" placeholder="Empresa" value="{{ empresa|default:'' }}">
+        </div>
+        <div class="col-md-2">
+            <input type="date" name="data" class="form-control" value="{{ data|date:'Y-m-d' }}"> 
+        </div>
+        <div class="col-md-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">🔎 Filtrar</button>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">✖ Limpar</a>
+            <a href="{% url 'exportar_eventos' %}?{{ request.GET.urlencode }}" class="btn btn-success">⬇ XLSX</a>
+        </div>
+      </form>
+
+      {# GRADE DE EVENTOS CADASTRADOS #}
+      {% include "gestcaptur/eventos_cadastrados_gestor.html" %}
+    </div>
+    {% endif %}
+    
+    {% if 'andamento' in guias_permitidas %}
+    {#EVENTOS EM ANDAMENTO#}
+    <div class="tab-pane fade {% if guia_ativa == 'andamento' %}show active{% endif %}" id="andamento" role="tabpanel" aria-labelledby="andamento-tab">
+      {% include "gestcaptur/eventos_andamento.html" with eventos=eventos_andamento %}
+    </div>
+    {% endif %}
+    {% if 'finalizados' in guias_permitidas %}
+    {#EVENTOS FINALIZADOS#}
+    <div class="tab-pane fade {% if guia_ativa == 'finalizados' %}show active{% endif %}" id="finalizados" role="tabpanel" aria-labelledby="finalizados-tab">
+      {% include 'gestcaptur/eventos_finalizados.html' with eventos=eventos_finalizados %}
+    </div>
+    {% endif %}
+    {% if 'fichas' in guias_permitidas %}
+    {# FICHAS CADASTRADAS #}
+    <div class="tab-pane fade {% if guia_ativa == 'fichas' %}show active{% endif %}" id="fichas" role="tabpanel" aria-labelledby="fichas-tab">
+      {% include 'gestcaptur/fichas_cadastradas_dashboard.html' %}
+    </div>
+    {% endif %}
+    {% if 'resumo' in guias_permitidas %}
+    {# RESUMO ESTATÍSTICO #} {# TODO: melhorar essa aba #}
+    <div class="tab-pane fade {% if guia_ativa == 'resumo' %}show active{% endif %}" id="resumo" role="tabpanel" aria-labelledby="resumo-tab">
+      <div class="card shadow-sm p-4">
+        <h4 class="mb-3">Resumo Estatístico dos Eventos</h4>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item d-flex justify-content-between">
+            <span>Total de Eventos:</span> <strong>{{ total_eventos }}</strong>
+          </li>
+          <li class="list-group-item d-flex justify-content-between">
+            <span>Total de Alunos:</span> <strong>{{ total_alunos }}</strong>
+          </li>
+          <li class="list-group-item d-flex justify-content-between">
+            <span>Total de Alunos com Foto:</span> <strong>{{ total_fotos }}</strong>
+          </li>
+          <li class="list-group-item d-flex justify-content-between">
+            <span>Total de Fotógrafos Ativos:</span> <strong>{{ total_fotografos }}</strong>
+          </li>
+          <li class="list-group-item d-flex justify-content-between">
+            <span>Tempo médio do evento em andamento:</span>
+            <strong>
+                {% if tempo_medio_evento %}
+                    {{ tempo_medio_evento }}
+                {% else %}
+                    0m
+                {% endif %}
+            </strong>
+        </li>
+          {# <li class="list-group-item d-flex justify-content-between"> #}
+            {# <span>Tempo médio de uso do cartão SD:</span> <strong>32m 45s</strong> #}
+          {# </li> #}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Debug: verificar se a função está carregada
+console.log('Script do dashboard gestor carregado');
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function iniciarEventoGestor(eventoId, nomeEvento) {
+    console.log('Função iniciarEventoGestor chamada', eventoId, nomeEvento);
+    
+    // Verificar se o CSRF token existe
+    const csrfToken = getCookie('csrftoken');
+    console.log('CSRF Token:', csrfToken);
+    
+    if (!csrfToken) {
+        alert('Erro: Token CSRF não encontrado. Recarregue a página.');
+        return;
+    }
+    
+    if (confirm(`Tem certeza que deseja INICIAR o evento "${nomeEvento}"?\n\nOs fotógrafos poderão começar a fotografar após a confirmação.`)) {
+        const btn = document.getElementById(`btn-iniciar-${eventoId}`);
+        
+        if (!btn) {
+            console.error('Botão não encontrado:', `btn-iniciar-${eventoId}`);
+            alert('Erro: Botão não encontrado');
+            return;
+        }
+        
+        const originalText = btn.innerHTML;
+        console.log('Iniciando requisição para evento:', eventoId);
+        
+        // Mostrar loading
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Iniciando...';
+        
+        const url = `/iniciar-evento-coordenador/${eventoId}/`;
+        console.log('URL da requisição:', url);
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => {
+            console.log('Resposta recebida:', response.status, response.statusText);
+            
+            if (response.status === 403) {
+                throw new Error('Sem permissão para executar esta ação');
+            }
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return response.json();
+        })
+        .then(data => {
+            console.log('Dados da resposta:', data);
+            
+            if (data.status === 'ok') {
+                // Mostrar sucesso
+                btn.className = 'btn btn-sm btn-success';
+                btn.innerHTML = '<i class="bi bi-check-circle"></i> Iniciado!';
+                
+                // Mostrar mensagem
+                alert(`✅ ${data.message}`);
+                
+                // Recarregar página após 2 segundos
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+                
+            } else {
+                console.error('Erro na resposta:', data);
+                alert(`❌ Erro: ${data.message}`);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('Erro na requisição:', error);
+            alert(`❌ Erro: ${error.message}`);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
+    }
+}
+
+// Registrar função globalmente
+window.iniciarEventoGestor = iniciarEventoGestor;
+console.log('Função iniciarEventoGestor registrada globalmente');
+
+function finalizarCapturaEvento(eventoId, nomeEvento) {
+  if (!confirm('Finalizar a captura de "' + nomeEvento + '"? Os links públicos, selfies e cadastros serão bloqueados.')) {
+    return;
+  }
+
+  const csrfToken = getCookie('csrftoken');
+  fetch('{% url "finalizar_captura_gestor" 0 %}'.replace('/0/', '/' + eventoId + '/'), {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken}
+  })
+  .then(response => response.json().then(data => ({ok: response.ok, data})))
+  .then(result => {
+    if (!result.ok) {
+      throw new Error(result.data.message || 'Não foi possível finalizar a captura.');
+    }
+    alert(result.data.message);
+    window.location.reload();
+  })
+  .catch(error => alert(error.message));
+}
+
+window.finalizarCapturaEvento = finalizarCapturaEvento;
+</script>
+{% endblock %}

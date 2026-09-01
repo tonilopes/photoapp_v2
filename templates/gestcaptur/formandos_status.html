@@ -1,0 +1,343 @@
+{% extends 'gestcaptur/base.html' %}
+{% load static %}
+
+{% block title %}Status de Formandos - {{ evento.fot }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h2 class="mb-1">📊 Status de Formandos</h2>
+            <p class="text-muted mb-0">
+                <strong>{{ evento.fot }}</strong> • {{ evento.data|date:"d/m/Y" }} • Turma: <strong>{{ evento.codigo_turma|default:"Não informada" }}</strong>
+            </p>
+        </div>
+        <div class="col-lg-4 text-end">
+            {% if captura_finalizada %}
+            <span class="badge bg-secondary me-2">Captura finalizada - somente leitura</span>
+            {% endif %}
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-grid"></i> Dashboard
+            </a>
+            {% if can_compartilhar %}
+            <a href="{% url 'formandos_link_compartilhamento_uuid' evento.uuid %}" class="btn btn-success {% if is_read_only %}disabled{% endif %}">
+                <i class="bi bi-share-fill"></i> 📱 Compartilhar Link/QRCode
+            </a>
+            {% endif %}
+            {% if can_importar_nomes %}
+            <a href="{% url 'importar_nomes_formandos_uuid' evento.uuid %}" class="btn btn-outline-primary {% if is_read_only %}disabled{% endif %}">
+                <i class="bi bi-file-earmark-excel"></i> Importar Nomes
+            </a>
+            {% endif %}
+            {% if can_gerenciar_parceiros and not is_read_only %}
+            <a href="{% url 'gerenciar_parceiros_evento_uuid' evento.uuid %}" class="btn btn-info" title="Vincular parceiros a este evento">
+                <i class="bi bi-people-fill"></i> Parceiros
+            </a>
+            {% endif %}
+            {% if can_download_cadastros %}
+            <a href="{% url 'exportar_formandos_uuid' evento.uuid %}?format=excel" class="btn btn-outline-info">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+            </a>
+            {% endif %}
+            {% if can_download_fotos and can_download_cadastros %}
+            <a href="{% url 'baixar_tudo_formandos_uuid' evento.uuid %}" class="btn btn-warning" title="Baixa todas as fotos em ZIP com estrutura de pastas + XLSX">
+                <i class="bi bi-cloud-download"></i> 📦 Baixar Tudo
+            </a>
+            {% endif %}
+            {% if can_finalizar_captura and evento.status != 'finalizado' %}
+            <button type="button" class="btn btn-danger" onclick="finalizarEvento({{ evento.id }}, '{{ evento.fot|escapejs }}')">
+                <i class="bi bi-stop-circle"></i> Finalizar evento
+            </button>
+            {% endif %}
+            {% if is_read_only and not can_download_fotos and not can_download_cadastros and not can_finalizar_captura %}
+            <span class="badge bg-secondary ms-2" title="Apenas leitura - sem permissão para download">Apenas Leitura</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title text-primary">{{ stats.total }}</h3>
+                    <p class="card-text">Total de Formandos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center shadow-sm border-success">
+                <div class="card-body">
+                    <h3 class="card-title text-success">{{ stats.com_selfie }}/{{ stats.total }}</h3>
+                    <p class="card-text">Com Selfie ({{ stats.pct_selfie|default:0 }}%)</p>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ stats.pct_selfie|default:0 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center shadow-sm border-info">
+                <div class="card-body">
+                    <h3 class="card-title text-info">{{ stats.com_cadastro }}/{{ stats.total }}</h3>
+                    <p class="card-text">Cadastro Completo ({{ stats.pct_cadastro|default:0 }}%)</p>
+                    <div class="progress">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: {{ stats.pct_cadastro|default:0 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center shadow-sm border-success">
+                <div class="card-body">
+                    <h3 class="card-title text-success">{{ stats.completos }}/{{ stats.total }}</h3>
+                    <p class="card-text">Totalmente Completos ({{ stats.pct_completos|default:0 }}%)</p>
+                    <div class="progress">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ stats.pct_completos|default:0 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Formandos -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-light py-3">
+            <h5 class="mb-0">📋 Lista de Formandos</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if alunos %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="30%">Nome</th>
+                            <th width="15%">Selfie</th>
+                            <th width="15%">Cadastro</th>
+                            <th width="15%">Status</th>
+                            <th width="15%">Foto</th>
+                            <th width="10%">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in alunos %}
+                        <tr {% if item.completo %}class="table-success"{% endif %}>
+                            <td>
+                                <strong>{{ item.aluno.nome }}</strong>
+                                {% if item.aluno.whatsapp %}
+                                <br><small class="text-muted">{{ item.aluno.whatsapp }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.selfie_ok %}
+                                <span class="badge bg-success">✅ Sim</span>
+                                {% else %}
+                                <span class="badge bg-danger">❌ Não</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.cadastro_ok %}
+                                <span class="badge bg-success">✅ Completo</span>
+                                {% else %}
+                                <span class="badge bg-warning">⏳ Incompleto</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.completo %}
+                                <span class="badge bg-success">✅ Finalizado</span>
+                                {% else %}
+                                <span class="badge bg-secondary">🔄 Pendente</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.aluno.foto %}
+                                <button class="btn btn-sm btn-outline-primary" onclick="abrirFoto('{{ item.aluno.foto.url }}', '{{ item.aluno.nome }}')" title="Visualizar foto">
+                                    <i class="bi bi-image"></i> Ver
+                                </button>
+                                {% else %}
+                                <small class="text-muted">Sem foto</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-outline-info" onclick="abrirCadastro({{ item.aluno.id }})" title="Ver Cadastro" data-bs-toggle="tooltip">
+                                        <i class="bi bi-file-text"></i>
+                                    </button>
+                                    {% if can_editar %}
+                                    <a href="{{ item.link_edicao }}" target="_blank" class="btn btn-outline-secondary" title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button class="btn btn-outline-warning" onclick="copiarLink('{{ item.link_edicao }}')" title="Copiar Link">
+                                        <i class="bi bi-link"></i>
+                                    </button>
+                                    {% endif %}
+
+
+                                    {% if request.user.is_superuser %}
+                                    <form method="post" action="{% url 'aluno_excluir' item.aluno.id %}" style="display:inline;" onsubmit="return confirm('Excluir o aluno {{ item.aluno.nome|escapejs }}? Esta ação não pode ser desfeita.');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button class="btn btn-outline-dark" title="Excluir aluno (somente superuser)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-5 text-center text-muted">
+                <p class="mb-0">
+                    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                </p>
+                <p class="mt-3 mb-0">Nenhum formando cadastrado ainda.</p>
+                {% if can_importar_nomes %}
+                <a href="{% url 'importar_nomes_formandos_uuid' evento.uuid %}" class="btn btn-primary mt-3">
+                    Importar Nomes
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Instruções de Acesso -->
+    <div class="alert alert-info mt-4">
+        <h6 class="alert-heading">💡 Como compartilhar o link:</h6>
+        <ul class="mb-0 small">
+            <li>Clique no ícone <i class="bi bi-link"></i> para copiar o link do formando</li>
+            <li>Compartilhe via WhatsApp, Email ou QRCode</li>
+            <li>O formando poderá acessar e corrigir seus dados a qualquer momento</li>
+            <li>Selfie é obrigatória - formando não conseguirá finalizar sem ela</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+.table-responsive {
+    max-height: calc(100vh - 300px);
+}
+
+.badge {
+    font-size: 0.9rem;
+    padding: 6px 10px;
+}
+
+.btn-group-sm .btn {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+}
+</style>
+
+<script>
+function copiarLink(link) {
+    navigator.clipboard.writeText(link).then(() => {
+        alert('✅ Link copiado para a área de transferência!');
+    }).catch(err => {
+        console.error('Erro ao copiar:', err);
+        prompt('Copie este link:', link);
+    });
+}
+
+function finalizarEvento(eventoId, nomeEvento) {
+    if (!confirm('Finalizar o evento "' + nomeEvento + '"? Os links públicos, selfies e cadastros serão bloqueados.')) {
+        return;
+    }
+
+    fetch('{% url "finalizar_captura_gestor" 0 %}'.replace('/0/', '/' + eventoId + '/'), {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (!result.status || result.status !== 'ok') {
+            throw new Error(result.message || 'Não foi possível finalizar o evento.');
+        }
+        alert(result.message);
+        window.location.reload();
+    })
+    .catch(error => alert(error.message));
+}
+
+function abrirFoto(fotoUrl, nomeFoto) {
+    // Criar modal para foto
+    const modalDiv = document.createElement('div');
+    modalDiv.className = 'modal fade';
+    modalDiv.id = 'modalFoto';
+    modalDiv.tabIndex = -1;
+    modalDiv.innerHTML = `
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-white">📸 ${nomeFoto}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center p-0">
+                    <img src="${fotoUrl}" alt="${nomeFoto}" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+                </div>
+                <div class="modal-footer border-secondary">
+                    <a href="${fotoUrl}" download="${nomeFoto}" class="btn btn-primary">
+                        <i class="bi bi-download"></i> Baixar
+                    </a>
+                    <a href="${fotoUrl}" target="_blank" class="btn btn-secondary">
+                        <i class="bi bi-box-arrow-up-right"></i> Abrir em Nova Aba
+                    </a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Adicionar ao DOM e exibir
+    document.body.appendChild(modalDiv);
+    const modal = new bootstrap.Modal(modalDiv);
+    modal.show();
+    
+    // Remover modal do DOM quando fechar
+    modalDiv.addEventListener('hidden.bs.modal', () => {
+        modalDiv.remove();
+    });
+}
+
+function abrirCadastro(alunoId) {
+    const url = `{% url 'formando_ver_cadastro' evento.id 0 %}`.replace('0', alunoId);
+    
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.text())
+    .then(html => {
+        // Criar modal
+        const modalDiv = document.createElement('div');
+        modalDiv.className = 'modal fade';
+        modalDiv.id = 'modalCadastro';
+        modalDiv.tabIndex = -1;
+        modalDiv.innerHTML = `<div class="modal-dialog modal-lg"><div class="modal-content">${html}</div></div>`;
+        
+        // Adicionar ao DOM e exibir
+        document.body.appendChild(modalDiv);
+        const modal = new bootstrap.Modal(modalDiv);
+        modal.show();
+        
+        // Remover modal do DOM quando fechar
+        modalDiv.addEventListener('hidden.bs.modal', () => {
+            modalDiv.remove();
+        });
+    })
+    .catch(err => {
+        console.error('Erro ao carregar cadastro:', err);
+        alert('❌ Erro ao carregar o cadastro do formando');
+    });
+}
+
+// Auto-refresh a cada 30 segundos
+// setTimeout(() => location.reload(), 30000);
+</script>
+{% endblock %}

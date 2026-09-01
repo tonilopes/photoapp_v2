@@ -1,0 +1,122 @@
+{# gestcaptur/templates/gestcaptur/eventos_cadastrados_gestor.html #}
+<div class="mt-4">
+    {% if eventos_cadastrados %}
+    <div class="table-responsive">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Tipo de Evento</th>
+                <th>Instituição</th>
+                <th>Data</th>
+                <th>Alunos</th>
+                <th>Fotógrafos</th>
+                <th>Coordenador</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for evento in eventos_cadastrados %}
+            <tr>
+                <td>{{ evento.id }}</td>
+                <td>{{ evento.tipo_evento }}</td>
+                <td>{{ evento.instituicao }}</td>
+                <td>{{ evento.data|date:"d/m/Y" }}</td>
+                <td>{{ evento.total_alunos|default:0 }}</td>
+                <td>
+                    {% for f in evento.fotografos.all %}
+                        {{ f.username }}{% if not forloop.last %}, {% endif %}
+                    {% empty %}
+                        N/A
+                    {% endfor %}
+                </td>
+                <td>{{ evento.coordenador }}</td>
+                <td>{{ evento.get_status_display }}</td>
+                <td class="text-center">
+                    <div class="btn-group" role="group" aria-label="Ações do Evento">
+                        {# Importar Alunos - Condição: Evento não iniciado/finalizado #}
+                        {% if evento.status != 'iniciado' and evento.status != 'finalizado' %}
+                            <a href="{% url 'importar_alunos' evento.id %}" class="btn btn-sm btn-success" title="Importar Alunos">
+                                <i class="bi bi-file-earmark-arrow-up-fill"></i>
+                            </a>
+                        {% else %}
+                            <button class="btn btn-sm btn-secondary" title="Importação indisponível" disabled>
+                                <i class="bi bi-file-earmark-arrow-up-fill"></i>
+                            </button>
+                        {% endif %}
+
+                        {# Editar Evento - Condição: Evento não finalizado #}
+                        {% if evento.status != 'finalizado' %}
+                            <a href="{% url 'editar_evento' evento.id %}" class="btn btn-sm btn-info" title="Editar Evento">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                        {% else %}
+                            <button class="btn btn-sm btn-secondary" title="Edição indisponível" disabled>
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                        {% endif %}
+                                
+                        {# Visualizar Alunos - Habilita se houver alunos importados #}
+                        {% if evento.total_alunos|default:0 > 0 %}
+                            <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-sm btn-primary" title="Visualizar Alunos">
+                                <i class="bi bi-people"></i>
+                            </a>
+                        {% else %}
+                            <button class="btn btn-sm btn-secondary" title="Nenhum aluno importado" disabled>
+                                <i class="bi bi-people"></i>
+                            </button>
+                        {% endif %}
+
+                        {# BOTÃO INICIAR - NOVO #}
+                        {% if evento.status == 'pendente' %}
+                        <button class="btn btn-sm btn-warning" 
+                                onclick="iniciarEventoGestor({{ evento.id }}, '{{ evento.tipo_evento|escapejs }}')"
+                                title="Iniciar Evento"
+                                id="btn-iniciar-{{ evento.id }}">
+                            <i class="bi bi-play-fill"></i> Iniciar
+                        </button>
+                        {% endif %}
+
+                        {% if can_finalizar_captura and evento.status != 'finalizado' %}
+                        <button class="btn btn-sm btn-danger"
+                                onclick="finalizarCapturaEvento({{ evento.id }}, '{{ evento.tipo_evento|escapejs }}')"
+                                title="Finalizar captura e bloquear selfies e cadastros públicos">
+                            <i class="bi bi-stop-circle"></i> Finalizar
+                        </button>
+                        {% endif %}
+                        
+                        {# Status se já iniciado ou finalizado #}
+                        {% if evento.status == 'iniciado' %}
+                        <span class="badge bg-success ms-1">
+                            <i class="bi bi-play-circle"></i> Em Andamento
+                        </span>
+                        {% elif evento.status == 'finalizado' %}
+                        <span class="badge bg-secondary ms-1">
+                            <i class="bi bi-check-circle"></i> Finalizado
+                        </span>
+                        {% endif %}
+
+                        {# Excluir Evento - Condição: Evento não iniciado/finalizado #}
+                        {% if evento.status != 'iniciado' and evento.status != 'finalizado' %}
+                            <a href="{% url 'deletar_evento' evento.id %}" class="btn btn-sm btn-danger" title="Excluir Evento">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        {% else %}
+                            <button class="btn btn-sm btn-secondary" title="Exclusão indisponível" disabled>
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center" role="alert">
+        Nenhum evento cadastrado ou pendente para exibir.
+    </div>
+    {% endif %}
+</div>

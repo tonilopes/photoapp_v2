@@ -1,0 +1,49 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+
+{% block title %}Deletar Evento{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> Confirmar Exclusão
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-warning"></i>
+                        <strong>Atenção!</strong> Esta ação não pode ser desfeita.
+                    </div>
+                    
+                    <p>Você tem certeza que deseja deletar o evento:</p>
+                    
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h5>{{ evento.tipo_evento }}</h5>
+                            <p class="mb-1"><strong>Instituição:</strong> {{ evento.instituicao }}</p>
+                            <p class="mb-1"><strong>Data:</strong> {{ evento.data|date:"d/m/Y" }} às {{ evento.horario }}</p>
+                            <p class="mb-1"><strong>Total de Alunos:</strong> {{ evento.total_alunos }}</p>
+                            <p class="mb-0"><strong>Status:</strong> {{ evento.get_status_display }}</p>
+                        </div>
+                    </div>
+                    
+                    <form method="post" class="mt-3">
+                        {% csrf_token %}
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a href="{% url 'listar_eventos' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Sim, Deletar Evento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load static %}
+
+{% block title %}Visualizar Aluno{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-person-badge"></i> {{ aluno.nome }}</h2>
+        <div class="btn-group" role="group">
+            <a href="{% url 'alunos_crud' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Voltar
+            </a>
+            <a href="{% url 'aluno_editar' aluno.id %}" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><strong>📋 Dados Pessoais</strong></div>
+                <div class="card-body">
+                    <p><strong>Nome:</strong> {{ aluno.nome }}</p>
+                    <p><strong>CPF:</strong> {{ aluno.cpf|default:"-" }}</p>
+                    <p><strong>Data Nascimento:</strong> {{ aluno.data_nascimento|date:"d/m/Y"|default:"-" }}</p>
+                    <p><strong>Email:</strong> {{ aluno.email|default:"-" }}</p>
+                    <p><strong>Instagram:</strong> {{ aluno.instagram|default:"-" }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><strong>📱 Contatos</strong></div>
+                <div class="card-body">
+                    <p><strong>WhatsApp:</strong> {{ aluno.whatsapp|default:"-" }}</p>
+                    <p><strong>Telefone Fixo:</strong> {{ aluno.telefone_fixo|default:"-" }}</p>
+                    <p><strong>Status:</strong>
+                        {% if aluno.cadastro_completo %}
+                            <span class="badge bg-success">Completo</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Parcial</span>
+                        {% endif %}
+                        {% if aluno.selfie_realizada or aluno.ident %}
+                            <span class="badge bg-info">Selfie ✅</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header"><strong>🏠 Endereço</strong></div>
+                <div class="card-body">
+                    <p><strong>Endereço:</strong> {{ aluno.endereco|default:"-" }}{% if aluno.numero %}, {{ aluno.numero }}{% endif %}{% if aluno.complemento %} ({{ aluno.complemento }}){% endif %}</p>
+                    <p><strong>Bairro:</strong> {{ aluno.bairro|default:"-" }} — <strong>Cidade:</strong> {{ aluno.cidade|default:"-" }} — <strong>Estado:</strong> {{ aluno.estado|default:"-" }}</p>
+                    <p><strong>CEP:</strong> {{ aluno.cep|default:"-" }}</p>
+                </div>
+            </div>
+        </div>
+        {% if aluno.nome_pai or aluno.nome_mae or aluno.nome_parente %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header"><strong>👨👩👥 Familiares</strong></div>
+                <div class="card-body">
+                    {% if aluno.nome_pai %}
+                        <p><strong>Pai:</strong> {{ aluno.nome_pai }} — {{ aluno.whatsapp_pai|default:"-" }}</p>
+                    {% endif %}
+                    {% if aluno.nome_mae %}
+                        <p><strong>Mãe:</strong> {{ aluno.nome_mae }} — {{ aluno.whatsapp_mae|default:"-" }}</p>
+                    {% endif %}
+                    {% if aluno.nome_parente %}
+                        <p><strong>Parente ({{ aluno.grau_parentesco|default:"-" }}):</strong> {{ aluno.nome_parente }} — {{ aluno.whatsapp_parente|default:"-" }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

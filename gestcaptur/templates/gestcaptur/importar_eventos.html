@@ -1,0 +1,21 @@
+{#importar_eventos.html#}
+
+{% extends "gestcaptur/base_gestor.html" %}
+
+{% block title %}Importar Eventos{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1>Importar Eventos</h1>
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+    <form method="post" enctype="multipart/form-data" class="mb-3">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Importar</button>
+    </form>
+</div>
+{% endblock %}

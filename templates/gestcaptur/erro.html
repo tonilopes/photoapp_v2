@@ -1,0 +1,35 @@
+{% extends 'gestcaptur/base.html' %}
+{% load static %}
+
+{% block title %}{{ titulo|default:"Erro" }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-danger text-white text-center py-5">
+                    <div style="font-size: 64px; margin-bottom: 10px;">❌</div>
+                    <h2 class="mb-0">{{ titulo|default:"Erro" }}</h2>
+                </div>
+
+                <div class="card-body p-5 text-center">
+                    <p class="fs-5 mb-4">{{ mensagem }}</p>
+
+                    {% if detalhe %}
+                    <div class="alert alert-light border mb-4">
+                        <p class="mb-0"><small>{{ detalhe }}</small></p>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-2">
+                        <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

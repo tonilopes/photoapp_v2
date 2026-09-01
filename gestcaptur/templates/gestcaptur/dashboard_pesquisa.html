@@ -1,0 +1,108 @@
+<!-- gestcaptur/templates/gestcaptur/dashboard_pesquisa.html -->
+
+{% extends 'gestcaptur/base_gestor.html' %} {# Você pode criar um base_pesquisa.html se precisar de um menu diferente #}
+{% load static %}
+
+{% block title %}Dashboard Pesquisa{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4"><i class="bi bi-search"></i> Dashboard de Pesquisa</h1>
+
+    <div class="alert alert-info" role="alert">
+        Olá, {{ request.user.first_name|default:request.user.username }}! Você está logado como **Pesquisa**.
+        Aqui você pode visualizar e exportar dados dos eventos, fotos e fichas, mas não criar ou modificar.
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4 col-sm-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_eventos }}</h4>
+                    <p class="mb-0">Total de Eventos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-sm-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_alunos }}</h4>
+                    <p class="mb-0">Total de Alunos Cadastrados</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-sm-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4>{{ total_fotos_geral }}</h4>
+                    <p class="mb-0">Total de Fotos Capturadas</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="mt-4">Eventos Disponíveis para Consulta</h2>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Tipo/Instituição</th>
+                    <th>Data</th>
+                    <th>Status</th>
+                    <th>Alunos</th>
+                    <th>Fotos</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for evento in eventos %}
+                <tr>
+                    <td>{{ evento.id }}</td>
+                    <td>
+                        <strong>{{ evento.tipo_evento }}</strong><br>
+                        <small class="text-muted">{{ evento.instituicao }}</small>
+                    </td>
+                    <td>{{ evento.data|date:"d/m/Y" }}</td>
+                    <td><span class="badge bg-secondary">{{ evento.get_status_display }}</span></td>
+                    <td>{{ evento.total_alunos_cadastrados }}</td>
+                    <td>{{ evento.total_fotos_capturadas }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-outline-primary" title="Ver Alunos">
+                                <i class="bi bi-people"></i>
+                            </a>
+                            {% if perms.gestcaptur.download_cadastros_evento %}
+                            <a href="{% url 'exportar_fichas' %}?evento_id={{ evento.id }}" class="btn btn-outline-success" title="Exportar Fichas">
+                                <i class="bi bi-file-excel"></i>
+                            </a>
+                            {% endif %}
+                            {% if perms.gestcaptur.download_fotos_evento %}
+                            <a href="{% url 'exportar_fotos_evento' %}?evento_id={{ evento.id }}" class="btn btn-outline-info" title="Baixar Fotos">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center text-muted">Nenhum evento encontrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h2 class="mt-4">Fichas e Fotos (Geral)</h2>
+    <div class="d-flex gap-2 mb-3">
+        <a href="{% url 'fichas_cadastradas' %}" class="btn btn-primary">
+            <i class="bi bi-file-text"></i> Ver Todas as Fichas
+        </a>
+        {% if perms.gestcaptur.download_cadastros_evento %}
+        <a href="{% url 'exportar_fichas' %}" class="btn btn-success">
+            <i class="bi bi-file-excel"></i> Exportar Todas as Fichas (XLSX)
+        </a>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

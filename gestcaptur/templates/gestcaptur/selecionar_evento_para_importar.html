@@ -1,0 +1,30 @@
+{# gestcaptur/templates/gestcaptur/selecionar_evento_para_importar.html #}
+{% extends 'gestcaptur/base.html' %}
+{% load static %}
+
+{% block title %}Selecionar Evento para Importar Alunos{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Selecionar Evento para Importação de Alunos</h2>
+
+    {% if eventos %}
+        <div class="list-group">
+            {% for evento in eventos %}
+                <a href="{% url 'importar_alunos' evento.id %}" class="list-group-item list-group-item-action">
+                    <strong>{{ evento.tipo_evento }}</strong> - {{ evento.instituicao }} 
+                    | <small>{{ evento.data|date:"d/m/Y" }}</small>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            Nenhum evento encontrado.
+        </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary">Voltar</a>
+    </div>
+</div>
+{% endblock %}

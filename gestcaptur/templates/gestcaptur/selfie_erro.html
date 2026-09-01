@@ -1,0 +1,15 @@
+{% extends "gestcaptur/base_publico.html" %}
+
+{% block title %}Erro - Captura de Selfie{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 100px auto; text-align: center; padding: 40px; background: #f8d7da; border-radius: 15px; border: 2px solid #f5c6cb;">
+    <h1 style="color: #721c24; margin-top: 0;">❌ Erro</h1>
+    <p style="color: #721c24; font-size: 16px; line-height: 1.6;">
+        {{ erro }}
+    </p>
+    <a href="/" style="display: inline-block; margin-top: 20px; padding: 12px 30px; background: #721c24; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+        ← Voltar à página inicial
+    </a>
+</div>
+{% endblock %}

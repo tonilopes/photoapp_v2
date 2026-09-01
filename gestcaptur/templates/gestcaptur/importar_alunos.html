@@ -1,0 +1,26 @@
+{% extends 'gestcaptur/base.html' %}
+{% load static %}
+
+{% block title %}Importar Alunos{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Importar Alunos para: {{ evento.tipo_evento }} - {{ evento.instituicao }}</h2>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label class="form-label">Selecione o arquivo Excel (.xlsx)</label>
+            {{ form.arquivo }}
+            {% if form.arquivo.errors %}
+                <div class="text-danger small">{{ form.arquivo.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-success">Importar</button>
+            <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-secondary">Voltar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

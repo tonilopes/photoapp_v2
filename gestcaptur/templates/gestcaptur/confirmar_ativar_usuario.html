@@ -1,0 +1,37 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load static %}
+
+{% block title %}Ativar Usuário - {{ usuario.username }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-play-circle"></i> Ativar Usuário
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="mb-4">
+                        Deseja <strong>reativar</strong> o usuário <strong>"{{ usuario.username }}"</strong>?
+                    </p>
+                    <p class="text-muted small">
+                        O usuário voltará a ter acesso ao sistema e poderá fazer login novamente..
+                    </p>
+                    <form method="post" class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        {% csrf_token %}
+                        <a href="{% url 'listar_usuarios' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-play-circle"></i> Ativar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

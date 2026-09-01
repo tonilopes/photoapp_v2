@@ -1,0 +1,135 @@
+{% extends 'gestcaptur/base.html' %}
+{% load static %}
+
+{% block title %}Cadastro Completo - Formandos{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Card de Sucesso -->
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-success text-white text-center py-5">
+                    <div style="font-size: 64px; margin-bottom: 10px;">✅</div>
+                    <h2 class="mb-0">Cadastro Finalizado com Sucesso!</h2>
+                </div>
+
+                <div class="card-body p-5 text-center">
+                    <!-- Mensagem Principal -->
+                    <div class="alert alert-success mb-4">
+                        <h5>Obrigado, <strong>{{ aluno.nome }}!</strong></h5>
+                        <p class="mb-0">Seus dados foram registrados com sucesso.</p>
+                    </div>
+
+                    <!-- Resumo dos Dados -->
+                    <div class="row mb-5">
+                        <div class="col-md-6 mb-3">
+                            <div class="info-box">
+                                <div class="info-icon">📸</div>
+                                <p class="info-label">Selfie Realizada</p>
+                                <p class="info-value">✅ Confirmada</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="info-box">
+                                <div class="info-icon">📝</div>
+                                <p class="info-label">Cadastro</p>
+                                <p class="info-value">✅ Completo</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Informações do Cadastro -->
+                    <table class="table table-sm table-borderless">
+                        <tbody>
+                            <tr>
+                                <td><strong>Nome Completo:</strong></td>
+                                <td>{{ aluno.nome }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>WhatsApp:</strong></td>
+                                <td>{{ aluno.whatsapp }}</td>
+                            </tr>
+                            {% if aluno.email %}
+                            <tr>
+                                <td><strong>Email:</strong></td>
+                                <td>{{ aluno.email }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if aluno.codigo_turma %}
+                            <tr>
+                                <td><strong>Turma:</strong></td>
+                                <td>{{ aluno.codigo_turma }}</td>
+                            </tr>
+                            {% endif %}
+                            <tr>
+                                <td><strong>Evento:</strong></td>
+                                <td>{{ evento.fot }} - {{ evento.data|date:"d/m/Y" }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Mensagem Final -->
+                    <div class="instruction-final">
+                        <h6 class="mb-3">✅ Registrado com Sucesso</h6>
+                        <p><strong>Sua foto de identificação e seus dados de contato estão registrados</strong></p>
+                        <p class="mb-0"><strong>Agradecemos sua participação!</strong></p>
+                    </div>
+
+                    <!-- Botão de Ação -->
+                    <div class="mt-5">
+                        <button type="button" class="btn btn-primary btn-lg" onclick="window.close()">
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.info-box {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+}
+
+.info-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.info-label {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+}
+
+.info-value {
+    font-size: 16px;
+    font-weight: bold;
+    color: #28a745;
+    margin: 5px 0 0 0;
+}
+
+.card-light {
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+}
+
+.instruction-final {
+    background: #e7f3ff;
+    border-left: 4px solid #28a745;
+    padding: 20px;
+    border-radius: 5px;
+    margin-top: 20px;
+}
+
+.instruction-final p {
+    margin-bottom: 10px;
+    color: #333;
+}
+</style>
+{% endblock %}

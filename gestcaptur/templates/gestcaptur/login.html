@@ -1,0 +1,158 @@
+<!-- gestcaptur/templates/gestcaptur/login.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login - PhotoApp</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Font Awesome (já deve vir de base.html se você o extender, mas incluído aqui para garantir se for standalone) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <!-- PWA (somente uso interno) -->
+    <link rel="manifest" href="{% static 'gestcaptur/manifest.json' %}">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="{% static 'gestcaptur/images/icons/icon-180.png' %}">
+
+{% block extra_head %} {# Se você tiver um block extra_head #}
+<style>
+    .btn-login-large {
+        padding-top: 1.5rem;   /* Por exemplo, dobre o padding padrão do Bootstrap (0.75rem) */
+        padding-bottom: 1.5rem;
+        font-size: 1.25rem;    /* Opcional: Aumente um pouco o tamanho da fonte */
+    }
+</style>
+{% endblock %}
+
+</head>
+
+<body class="bg-light">
+    <div class="container d-flex justify-content-center align-items-center vh-100">
+        <div class="card p-4 shadow" style="width: 350px;">
+            <h3 class="text-center mb-4">Login</h3>
+            
+            {# Bloco de mensagens - se esta página *não* estender base.html, mantenha este bloco #}
+            {# Se esta página *extender* base.html, REMOVA este bloco, pois as mensagens serão tratadas pelo base.html #}
+            {% if messages %}
+                <div id="login-messages-container" class="mb-3">
+                    {% for message in messages %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="{{ form.username.id_for_label }}" class="form-label">Usuário</label>
+                    <input type="text"
+                           name="{{ form.username.name }}"
+                           id="{{ form.username.id_for_label }}"
+                           class="form-control {% if form.username.errors %}is-invalid{% endif %}"
+                           placeholder="Digite seu usuário"
+                           value="{{ form.username.value|default_if_none:'' }}" {# Mantém o valor digitado após submissão #}
+                           required>
+                    {% if form.username.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.username.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="{{ form.password.id_for_label }}" class="form-label">Senha</label>
+                    <div class="input-group"> {# Adiciona o input-group para envolver o campo e o botão #}
+                        <input type="password"
+                               name="{{ form.password.name }}"
+                               id="{{ form.password.id_for_label }}"
+                               class="form-control {% if form.password.errors %}is-invalid{% endif %}"
+                               placeholder="Digite sua senha"
+                               required>
+                        <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                            <i class="fa fa-eye" aria-hidden="true"></i> {# Ícone de olho #}
+                        </button>
+                    </div>
+                    {% if form.password.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.password.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <button type="submit" class="btn btn-primary w-100 btn-login-large">Entrar</button>
+            </form>
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Script para o botão do olho na senha e (opcionalmente) mensagens de login -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('{{ form.password.id_for_label }}');
+
+            if (togglePassword && passwordInput) {
+                togglePassword.addEventListener('click', function (e) {
+                    e.preventDefault(); // Evita que o clique no botão envie o formulário
+                    
+                    // Alterna o tipo do input entre 'password' e 'text'
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+
+                    // Alterna os ícones de Font Awesome
+                    this.querySelector('i').classList.toggle('fa-eye');
+                    this.querySelector('i').classList.toggle('fa-eye-slash'); // Ícone de olho com barra
+                });
+            }
+
+            {# Se este template *não* estender base.html, e o bloco de mensagens acima for mantido, use este script #}
+            var loginMessagesContainer = document.getElementById('login-messages-container');
+            if (loginMessagesContainer) {
+                var messages = loginMessagesContainer.querySelectorAll('.alert');
+                messages.forEach(function(message) {
+                    var closeButton = message.querySelector('.btn-close');
+                    if (closeButton) {
+                        closeButton.remove();
+                    }
+                    setTimeout(function() {
+                        message.classList.add('fade-out');
+                        message.addEventListener('transitionend', function() {
+                            message.remove();
+                        }, { once: true });
+                    }, 3000);
+                });
+                // Adicione o CSS de fade-out ao head para esta página, se não vier de base.html
+                // APENAS SE login.html FOR UM TEMPLATE STANDALONE E NÃO EXTENDER base.html
+                var style = document.createElement('style');
+                style.innerHTML = `
+                    .alert.fade-out {
+                        opacity: 0;
+                        transition: opacity 0.5s ease-out;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        });
+    </script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js');
+      }
+    </script>
+</body>
+</html>

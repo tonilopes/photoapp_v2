@@ -1,0 +1,184 @@
+{% extends 'gestcaptur/base.html' %}
+{% load static %}
+
+{% block title %}Importar Nomes - {{ evento.fot }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white py-4">
+                    <h3 class="mb-0">
+                        <i class="bi bi-file-earmark-excel"></i> Importar Nomes de Formandos
+                    </h3>
+                    <small class="text-light">Evento: {{ evento.fot }} - {{ evento.data|date:"d/m/Y" }}</small>
+                </div>
+
+                <div class="card-body p-4">
+                    <!-- Instruções -->
+                    <div class="alert alert-info mb-4">
+                        <h6 class="alert-heading">📋 Como funciona:</h6>
+                        <ol class="mb-0">
+                            <li>Prepare um arquivo <strong>.xlsx (Excel)</strong> com uma coluna chamada <strong>"nome"</strong></li>
+                            <li>Cada linha deve conter um nome de formando</li>
+                            <li>Nomes duplicados serão ignorados automaticamente</li>
+                            <li>Após importar, os formandos poderão editar seus nomes se estiverem errados</li>
+                            <li>Todos receberão um link pessoal para fazer selfie + completar cadastro</li>
+                        </ol>
+                    </div>
+
+                    <!-- Template de Arquivo -->
+                    <div class="card bg-light border-0 mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title">📥 Template de Arquivo</h6>
+                            <p class="mb-2">Seu arquivo Excel deve seguir este modelo:</p>
+                            <table class="table table-sm table-bordered bg-white">
+                                <thead>
+                                    <tr>
+                                        <th>nome</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>João Silva Santos</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Maria Oliveira Costa</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Pedro José Silva</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <small class="text-muted">
+                                A coluna pode se chamar: <strong>nome</strong>, <strong>nomes</strong>, <strong>Nome Completo</strong>, etc.
+                                <br>O importante é que identifique os nomes dos formandos.
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Formulário de Upload -->
+                    <form method="post" enctype="multipart/form-data" id="importForm">
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <label for="arquivo" class="form-label">
+                                <strong>Selecione o arquivo .xlsx</strong> <span class="text-danger">*</span>
+                            </label>
+                            <input type="file" name="arquivo" id="arquivo" class="form-control form-control-lg" 
+                                   accept=".xlsx" required>
+                            <small class="text-muted d-block mt-2">
+                                ✅ Apenas arquivos .xlsx (Excel 2007+)
+                                <br>❌ Não aceita .xls, .csv ou outros formatos
+                            </small>
+                        </div>
+
+                        <!-- Preview de Nomes (Dinâmico) -->
+                        <div id="preview" style="display: none;">
+                            <div class="alert alert-light border mb-4">
+                                <h6 class="alert-heading">👀 Preview de Nomes</h6>
+                                <p class="small text-muted mb-2">Será importado:</p>
+                                <div id="previewList" style="max-height: 200px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-grid gap-2 d-sm-flex justify-content-sm-end">
+                            <a href="{% url 'formandos_status' evento.id %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-upload"></i> Importar Nomes
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Avisos Importantes -->
+                    <div class="alert alert-warning mt-4 mb-0">
+                        <h6 class="alert-heading">⚠️ Atenção!</h6>
+                        <ul class="mb-0 small">
+                            <li>Nomes duplicados <strong>não serão importados</strong></li>
+                            <li>Cada formando receberá um <strong>link pessoal único</strong> para acessar</li>
+                            <li>O formando pode <strong>editar seu nome</strong> se estiver incorreto</li>
+                            <li>A <strong>selfie é obrigatória</strong> para finalizar o cadastro</li>
+                            <li>Você poderá visualizar o status de cada formando no painel de controle</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Volta para Grade -->
+            <div class="text-center mt-4">
+                <a href="{% url 'formandos_status' evento.id %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar para Status
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+#previewList {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+#previewList li {
+    padding: 5px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+#previewList li:last-child {
+    border-bottom: none;
+}
+</style>
+
+<script>
+document.getElementById('arquivo').addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validar extensão
+    if (!file.name.endsWith('.xlsx')) {
+        alert('❌ Por favor, selecione um arquivo .xlsx');
+        this.value = '';
+        return;
+    }
+
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('❌ O arquivo é muito grande (máximo 5MB)');
+        this.value = '';
+        return;
+    }
+
+    // Tentar ler arquivo para preview (opcional)
+    try {
+        // Aqui você pode adicionar lógica para ler o Excel
+        // Por enquanto, apenas mostra que um arquivo foi selecionado
+        document.getElementById('preview').style.display = 'block';
+        document.getElementById('previewList').innerHTML = `
+            <div class="alert alert-success mb-0">
+                <i class="bi bi-check-circle"></i> Arquivo selecionado: <strong>${file.name}</strong>
+                <br><small>Tamanho: ${(file.size / 1024).toFixed(2)} KB</small>
+            </div>
+        `;
+    } catch (err) {
+        console.error('Erro ao processar arquivo:', err);
+    }
+});
+
+// Validar antes de enviar
+document.getElementById('importForm').addEventListener('submit', function(e) {
+    const arquivo = document.getElementById('arquivo').value;
+    if (!arquivo) {
+        e.preventDefault();
+        alert('⚠️ Selecione um arquivo antes de enviar');
+        return false;
+    }
+});
+</script>
+{% endblock %}

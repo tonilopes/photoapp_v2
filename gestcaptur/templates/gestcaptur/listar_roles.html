@@ -1,0 +1,53 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+
+{% block title %}Roles e Permissões{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-shield-lock"></i> Roles e Permissões</h2>
+        <a href="{% url 'criar_role' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Criar Role
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Permissões de Eventos</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for role in roles %}
+                        <tr>
+                            <td><strong>{{ role.name }}</strong></td>
+                            <td>
+                                {% for permissao in role.permissions.all %}
+                                    {% if permissao.content_type.app_label == 'gestcaptur' and permissao.content_type.model == 'evento' %}
+                                        <span class="badge bg-secondary me-1">{{ permissao.name }}</span>
+                                    {% endif %}
+                                {% empty %}
+                                    <span class="text-muted">Nenhuma</span>
+                                {% endfor %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'editar_role' role.id %}" class="btn btn-sm btn-outline-primary" title="Editar role">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-center text-muted">Nenhum role cadastrado.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

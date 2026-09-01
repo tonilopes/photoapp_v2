@@ -1,0 +1,38 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load static %}
+
+{% block title %}Excluir Parceiro - {{ parceiro.username }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> Excluir Parceiro
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="mb-4">
+                        Você tem certeza que deseja <strong>excluir permanentemente</strong> o parceiro <strong>"{{ parceiro.username }}"</strong>?
+                    </p>
+                    <p class="text-muted small">
+                        Essa ação <strong>não pode ser desfeita</strong>. O parceiro perderá acesso ao sistema.
+                    </p>
+
+                    <form method="post" class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        {% csrf_token %}
+                        <a href="{% url 'listar_parceiros' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Excluir Permanentemente
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

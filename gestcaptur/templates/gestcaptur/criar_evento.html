@@ -1,0 +1,604 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Criar Evento{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Estilo para seleção de roles */
+    .roles-selection {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .roles-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    .role-card {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .role-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 2px 8px rgba(0,123,255,0.15);
+    }
+
+    .role-card.selected {
+        border-color: #007bff;
+        background: #f0f8ff;
+        box-shadow: 0 2px 8px rgba(0,123,255,0.2);
+    }
+
+    .role-checkbox {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .role-info h6 {
+        color: #495057;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .role-info small {
+        color: #6c757d;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+    .role-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border-radius: 4px;
+        margin-top: 0.5rem;
+    }
+
+    .badge-fotografo {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .badge-coordenador {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .roles-grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+        }
+        
+        .role-card {
+            padding: 0.75rem;
+        }
+        
+        .role-checkbox {
+            top: 0.5rem;
+            right: 0.5rem;
+        }
+    }
+
+    /* Estilo para campos do formulário */
+    .form-section {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #007bff;
+    }
+
+    .form-section h5 {
+        color: #007bff;
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+
+    .required-field::after {
+        content: " *";
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    /* Debug: Garantir que checkboxes estejam visíveis */
+    input[name="fotografos"] {
+        opacity: 1 !important;
+        position: relative !important;
+        width: auto !important;
+        height: auto !important;
+        margin-right: 8px !important;
+    }
+
+    .form-check-input {
+        margin-top: 0.25rem !important;
+    }
+
+    /* Destacar checkboxes selecionados */
+    input[name="fotografos"]:checked + label {
+        font-weight: bold;
+        color: #0d6efd;
+    }
+
+    .role-checkbox {
+        position: absolute !important;
+        top: 10px !important;
+        right: 10px !important;
+        width: 20px !important;
+        height: 20px !important;
+        opacity: 1 !important;
+        z-index: 10 !important;
+        cursor: pointer !important;
+        margin: 0 !important;
+    }
+
+    /* Destacar card quando checkbox marcado */
+    .role-card.selected {
+        border-color: #007bff !important;
+        background: #f0f8ff !important;
+        box-shadow: 0 2px 8px rgba(0,123,255,0.2) !important;
+    }
+
+    /* Estilo do checkbox marcado */
+    .role-checkbox:checked {
+        background-color: #007bff !important;
+        border-color: #007bff !important;
+    }
+
+    /* Debug: Garantir que checkboxes estejam visíveis */
+    input[name="fotografos"] {
+        opacity: 1 !important;
+        position: absolute !important;
+        width: 20px !important;
+        height: 20px !important;
+        top: 10px !important;
+        right: 10px !important;
+        z-index: 10 !important;
+    }
+
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-plus-circle"></i> Criar Novo Evento
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Dados Básicos do Evento -->
+                        <div class="form-section">
+                            <h5><i class="bi bi-calendar-event"></i> Dados do Evento</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.fot.id_for_label }}" class="form-label required-field">
+                                        {{ form.fot.label }}
+                                    </label>
+                                    {{ form.fot|add_class:"form-control" }}
+                                    {% if form.fot.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.fot.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.data.id_for_label }}" class="form-label required-field">
+                                        {{ form.data.label }}
+                                    </label>
+                                    {{ form.data|add_class:"form-control" }}
+                                    {% if form.data.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.data.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="{{ form.horario.id_for_label }}" class="form-label required-field">
+                                        {{ form.horario.label }}
+                                    </label>
+                                    {{ form.horario|add_class:"form-control" }}
+                                    {% if form.horario.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.horario.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.tipo_evento.id_for_label }}" class="form-label required-field">
+                                        {{ form.tipo_evento.label }}
+                                    </label>
+                                    {{ form.tipo_evento|add_class:"form-control" }}
+                                    {% if form.tipo_evento.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.tipo_evento.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.instituicao.id_for_label }}" class="form-label required-field">
+                                        {{ form.instituicao.label }}
+                                    </label>
+                                    {{ form.instituicao|add_class:"form-control" }}
+                                    {% if form.instituicao.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.instituicao.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.curso.id_for_label }}" class="form-label">
+                                        {{ form.curso.label }}
+                                    </label>
+                                    {{ form.curso|add_class:"form-control" }}
+                                    {% if form.curso.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.curso.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.empresa.id_for_label }}" class="form-label">
+                                        {{ form.empresa.label }}
+                                    </label>
+                                    {{ form.empresa|add_class:"form-control" }}
+                                    {% if form.empresa.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.empresa.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.observacoes.id_for_label }}" class="form-label">
+                                    {{ form.observacoes.label }}
+                                </label>
+                                {{ form.observacoes|add_class:"form-control" }}
+                                {% if form.observacoes.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.observacoes.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Local do Evento -->
+                        <div class="form-section">
+                            <h5><i class="bi bi-geo-alt"></i> Local do Evento</h5>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.local.id_for_label }}" class="form-label required-field">
+                                    {{ form.local.label }}
+                                </label>
+                                {{ form.local|add_class:"form-control" }}
+                                {% if form.local.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.local.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.endereco.id_for_label }}" class="form-label">
+                                    {{ form.endereco.label }}
+                                </label>
+                                {{ form.endereco|add_class:"form-control" }}
+                                {% if form.endereco.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.endereco.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+<!-- Seleção de Fotógrafos -->
+<div class="form-section">
+    <h5><i class="bi bi-camera"></i> Fotógrafos Atribuídos</h5>
+    
+    <div class="roles-selection">
+        <label class="form-label">Selecione os fotógrafos para este evento:</label>
+        
+        <!-- ✅ DEBUG: Mostrar como o Django está renderizando -->
+        <div class="mb-2 small text-muted">
+            <strong>Debug Django:</strong> {{ form.fotografos }}
+        </div>
+        
+        <div class="roles-grid" id="fotografos-grid">
+            {% for fotografo in form.fotografos.field.queryset %}
+                <div class="role-card" data-role="fotografo" onclick="toggleRole(this, '{{ fotografo.id }}', 'fotografos')">
+                    <!-- ✅ CORRIGIDO: Renderização manual com values corretos -->
+                    <input type="checkbox" 
+                           name="fotografos" 
+                           value="{{ fotografo.id }}" 
+                           id="id_fotografos_{{ forloop.counter0 }}"
+                           class="role-checkbox form-check-input"
+                           style="position: absolute; top: 10px; right: 10px; width: 20px; height: 20px;">
+                    
+                    <div class="role-info">
+                        <h6>{{ fotografo.get_full_name|default:fotografo.username }}</h6>
+                        <small><i class="bi bi-person-circle"></i> Fotógrafo</small>
+                        <small><i class="bi bi-hash"></i> ID: {{ fotografo.id }}</small>
+                        <span class="role-badge badge-fotografo">
+                            <i class="bi bi-camera-fill"></i> Fotógrafo
+                        </span>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="col-12">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Nenhum fotógrafo cadastrado no sistema.
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- ✅ ADICIONADO: Debug visual em tempo real -->
+        <div class="mt-2 small text-muted">
+            <strong>Debug:</strong> 
+            <span id="debug-fotografos">Nenhum fotógrafo selecionado</span>
+        </div>
+        
+        {% if form.fotografos.errors %}
+            <div class="invalid-feedback d-block mt-2">
+                {{ form.fotografos.errors.0 }}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+                        <!-- Seleção de Coordenador -->
+                        <div class="form-section">
+                            <h5><i class="bi bi-person-gear"></i> Coordenador Responsável</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label for="{{ form.coordenador.id_for_label }}" class="form-label">
+                                        {{ form.coordenador.label }}
+                                    </label>
+                                    {{ form.coordenador|add_class:"form-select" }}
+                                    {% if form.coordenador.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.coordenador.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4 mb-3 d-flex align-items-end">
+                                    <div class="form-check">
+                                        {{ form.coordenador_tambem_fotografo }}
+                                        <label for="{{ form.coordenador_tambem_fotografo.id_for_label }}" class="form-check-label">
+                                            {{ form.coordenador_tambem_fotografo.label }}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seção: Evento com Selfie (Formandos) -->
+                        <div class="form-section" style="border-left-color: #28a745; background: #f0f9f6;">
+                            <h5 style="color: #28a745;"><i class="bi bi-camera-fill"></i> Evento com Selfie e Cadastro de Formandos</h5>
+                            <p class="text-muted small mb-3">
+                                <strong>Marque para ativar:</strong> Formandos receberão um link ou QRCode para fazer selfie e preencher cadastro online.
+                            </p>
+                            
+                            <!-- Ativar Selfie -->
+                            <div class="row mb-3">
+                                <div class="col-md-12">
+                                    <div class="form-check">
+                                        {{ form.para_selfie }}
+                                        <label for="{{ form.para_selfie.id_for_label }}" class="form-check-label fw-bold">
+                                            ✓ Ativar captura de selfie pública para este evento
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        Quando ativado, formandos poderão capturar selfie e fazer cadastro pelo formulário público
+                                    </small>
+                                </div>
+                            </div>
+
+                            <!-- Código da Turma -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ form.codigo_turma.id_for_label }}" class="form-label">
+                                        {{ form.codigo_turma.label }}
+                                    </label>
+                                    {{ form.codigo_turma|add_class:"form-control" }}
+                                    <small class="text-muted">Ex: 2024-A, EM-001, 3º-Ano-B</small>
+                                    {% if form.codigo_turma.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.codigo_turma.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Permitir Importação de Nomes -->
+                                <div class="col-md-6 mb-3 d-flex align-items-end">
+                                    <div class="form-check">
+                                        {{ form.permite_importacao_nomes }}
+                                        <label for="{{ form.permite_importacao_nomes.id_for_label }}" class="form-check-label">
+                                            {{ form.permite_importacao_nomes.label }}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info small" role="alert">
+                                <strong>💡 Dica:</strong> Você pode importar uma lista de nomes de formandos (XLSX) e ativar um painel de controle para acompanhar o progresso de selfies e cadastros.
+                            </div>
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> Criar Evento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+function toggleRole(cardElement, value, fieldName) {
+    // Evitar propagação do evento
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    const checkbox = cardElement.querySelector('input[type="checkbox"]');
+    
+    if (!checkbox) {
+        console.error('❌ Checkbox não encontrado no card');
+        return;
+    }
+    
+    // Toggle checkbox
+    checkbox.checked = !checkbox.checked;
+    
+    // Debug
+    console.log(`📸 Checkbox ${value} ${checkbox.checked ? 'marcado' : 'desmarcado'}`);
+    
+    // Toggle visual state
+    if (checkbox.checked) {
+        cardElement.classList.add('selected');
+    } else {
+        cardElement.classList.remove('selected');
+    }
+    
+    // Disparar evento change
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    // ✅ ADICIONADO: Atualizar debug visual
+    atualizarDebugFotografos();
+}
+
+function atualizarDebugFotografos() {
+    const selecionados = document.querySelectorAll('input[name="fotografos"]:checked');
+    const debugElement = document.getElementById('debug-fotografos');
+    
+    if (debugElement) {
+        if (selecionados.length === 0) {
+            debugElement.textContent = 'Nenhum fotógrafo selecionado';
+            debugElement.className = 'text-muted';
+        } else {
+            const nomes = Array.from(selecionados).map(cb => {
+                const card = cb.closest('.role-card');
+                const nome = card.querySelector('h6').textContent;
+                return `${nome} (ID: ${cb.value})`;
+            });
+            debugElement.innerHTML = `<strong>${selecionados.length} selecionado(s):</strong> ${nomes.join(', ')}`;
+            debugElement.className = 'text-success';
+        }
+    }
+    
+    console.log(`📊 Total fotógrafos selecionados: ${selecionados.length}`);
+}
+
+// Initialize visual state on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔧 Debug do formulário carregado');
+    
+    // Inicializar estado visual
+    document.querySelectorAll('#fotografos-grid .role-card').forEach(function(card) {
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        if (checkbox && checkbox.checked) {
+            card.classList.add('selected');
+        }
+    });
+    
+    // Event listeners para mudanças nos checkboxes
+    document.querySelectorAll('.role-checkbox').forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            const card = this.closest('.role-card');
+            if (this.checked) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+            
+            console.log(`📸 Checkbox ${this.value} alterado: ${this.checked}`);
+            atualizarDebugFotografos();
+        });
+    });
+    
+    // Debug do formulário ao enviar
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            console.log('📤 Formulário sendo enviado...');
+            
+            const fotografosCheckboxes = document.querySelectorAll('input[name="fotografos"]:checked');
+            console.log('📸 Fotógrafos selecionados:', fotografosCheckboxes.length);
+            
+            fotografosCheckboxes.forEach((checkbox, index) => {
+                const card = checkbox.closest('.role-card');
+                const nome = card.querySelector('h6').textContent;
+                console.log(`  ${index + 1}. ID: ${checkbox.value}, Nome: ${nome}`);
+            });
+            
+            // Verificar FormData
+            const formData = new FormData(form);
+            console.log('📋 Dados do formulário:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`  ${key}: "${value}"`);
+            }
+        });
+    }
+    
+    // ✅ CORRIGIDO: Debug dos checkboxes
+    console.log('🔍 Verificando checkboxes de fotógrafos...');
+    const allFotografosCheckboxes = document.querySelectorAll('input[name="fotografos"]');
+    console.log(`📊 Total de checkboxes encontrados: ${allFotografosCheckboxes.length}`);
+    
+    allFotografosCheckboxes.forEach((checkbox, index) => {
+        console.log(`  ${index + 1}. ID: ${checkbox.id}, Value: "${checkbox.value}", Checked: ${checkbox.checked}`);
+    });
+    
+    // Atualizar debug inicial
+    atualizarDebugFotografos();
+});
+</script>
+{% endblock %}

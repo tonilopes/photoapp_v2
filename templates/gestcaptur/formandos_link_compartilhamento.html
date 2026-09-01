@@ -1,0 +1,306 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+
+{% block title %}Compartilhar Link - Formandos{% endblock %}
+
+{% block extra_head %}
+<style>
+    .compartilhamento-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    
+    .qr-section {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .qr-code {
+        max-width: 300px;
+        margin: 1.5rem auto;
+        padding: 1rem;
+        background: white;
+        border: 2px solid #007bff;
+        border-radius: 8px;
+    }
+    
+    .qr-code img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    
+    .link-section {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #28a745;
+    }
+    
+    .link-input {
+        display: flex;
+        gap: 0.5rem;
+    }
+    
+    .link-input input {
+        flex: 1;
+        padding: 0.75rem;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 0.85rem;
+    }
+    
+    .btn-copy {
+        padding: 0.75rem 1rem;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    
+    .btn-copy:hover {
+        background: #0056b3;
+    }
+    
+    .btn-copy.copied {
+        background: #28a745;
+    }
+    
+    .opcoes-compartilhamento {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+    
+    .opcao-btn {
+        padding: 1rem;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-decoration: none;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .opcao-btn:hover {
+        border-color: #007bff;
+        background: #f0f8ff;
+        box-shadow: 0 2px 8px rgba(0,123,255,0.2);
+    }
+    
+    .opcao-icon {
+        font-size: 1.5rem;
+    }
+    
+    .instrucoes {
+        background: #fff3cd;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .instrucoes h6 {
+        margin: 0 0 0.75rem 0;
+        color: #856404;
+    }
+    
+    .instrucoes ul {
+        margin: 0;
+        padding-left: 1.5rem;
+    }
+    
+    .instrucoes li {
+        margin-bottom: 0.5rem;
+        color: #856404;
+    }
+    
+    .evento-info {
+        background: #e7f3ff;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #007bff;
+    }
+    
+    .evento-info h5 {
+        margin: 0 0 0.5rem 0;
+        color: #0c5aa6;
+    }
+    
+    .evento-info p {
+        margin: 0.25rem 0;
+        color: #004085;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="compartilhamento-container">
+        <!-- Cabeçalho -->
+        <div style="margin-bottom: 2rem;">
+            <a href="{% url 'formandos_status' evento.id %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Voltar ao Painel
+            </a>
+        </div>
+        
+        <h2 class="mb-4">
+            <i class="bi bi-share-fill"></i> Compartilhar Link com Formandos
+        </h2>
+        
+        <!-- Informações do Evento -->
+        <div class="evento-info">
+            <h5>{{ evento.codigo_turma|default:evento.fot }} - {{ evento.tipo_evento }}</h5>
+            <p><strong>Instituição:</strong> {{ evento.instituicao }}</p>
+            <p><strong>Código Turma:</strong> {{ evento.codigo_turma|default:"Não especificado" }}</p>
+        </div>
+        
+        <!-- Instruções -->
+        <div class="instrucoes">
+            <h6><i class="bi bi-lightbulb"></i> Como usar:</h6>
+            <ul>
+                <li>Copie o <strong>link direto</strong> abaixo</li>
+                <li>Ou imprima o <strong>QRCode</strong> para colar em cartazes</li>
+                <li>Compartilhe via <strong>WhatsApp, E-mail ou Grupos</strong></li>
+                <li>Formandos acessarão e farão selfie + cadastro</li>
+            </ul>
+        </div>
+        
+        <!-- QRCode -->
+        <div class="qr-section">
+            <h5 class="mb-3">
+                <i class="bi bi-qr-code"></i> Código QR
+            </h5>
+            <p class="text-muted small">Aponte câmera do celular para acessar</p>
+            <div class="qr-code">
+                <img src="{{ qr_code }}" alt="QRCode do evento">
+            </div>
+            <button onclick="imprimirQRCode()" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-printer"></i> Imprimir QRCode
+            </button>
+        </div>
+        
+        <!-- Link Direto -->
+        <div class="link-section">
+            <h5 class="mb-3">
+                <i class="bi bi-link-45deg"></i> Link Direto
+            </h5>
+            <div class="link-input">
+                <input 
+                    type="text" 
+                    id="linkInput" 
+                    value="{{ link_publico }}" 
+                    readonly
+                    onclick="this.select()"
+                    title="Clique para selecionar"
+                >
+                <button class="btn-copy" onclick="copiarLink()">
+                    <i class="bi bi-clipboard"></i> Copiar
+                </button>
+            </div>
+            <small class="text-muted d-block mt-2">
+                ✅ Link funciona sem login - qualquer pessoa pode acessar
+            </small>
+        </div>
+        
+        <!-- Opções de Compartilhamento -->
+        <div>
+            <h5 class="mb-3">
+                <i class="bi bi-share"></i> Compartilhar Via
+            </h5>
+            <div class="opcoes-compartilhamento">
+                <a href="https://wa.me/?text=Formandos!%20Tirem%20sua%20selfie%20aqui:%20{{ link_publico }}" 
+                   target="_blank" 
+                   class="opcao-btn">
+                    <span class="opcao-icon">💬</span>
+                    <span>WhatsApp</span>
+                </a>
+                
+                <a href="mailto:?subject=Acesso%20Formandos%20-%20{{ evento.fot }}&body=Formandos!%0A%0AAcesse%20para%20fazer%20selfie%20e%20cadastro:%0A%0A{{ link_publico }}" 
+                   class="opcao-btn">
+                    <span class="opcao-icon">📧</span>
+                    <span>E-mail</span>
+                </a>
+                
+                <button onclick="copiarLink(); alert('Link copiado! Cole em qualquer lugar.')" 
+                        class="opcao-btn">
+                    <span class="opcao-icon">📋</span>
+                    <span>Copiar</span>
+                </button>
+                
+                <button onclick="imprimirQRCode()" 
+                        class="opcao-btn">
+                    <span class="opcao-icon">🖨️</span>
+                    <span>Imprimir</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Botões de Ação -->
+        <div style="margin-top: 2rem; text-align: center;">
+            <a href="{% url 'formandos_status' evento.id %}" class="btn btn-primary btn-lg">
+                <i class="bi bi-grid-3x3"></i> Ver Painel de Controle
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function copiarLink() {
+    const input = document.getElementById('linkInput');
+    input.select();
+    document.execCommand('copy');
+    
+    // Feedback visual
+    const btn = event.target;
+    const original = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check"></i> Copiado!';
+    btn.classList.add('copied');
+    
+    setTimeout(() => {
+        btn.innerHTML = original;
+        btn.classList.remove('copied');
+    }, 2000);
+}
+
+function imprimirQRCode() {
+    const printWindow = window.open('', '', 'height=600,width=600');
+    const qrImg = document.querySelector('.qr-code img').src;
+    
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>{{ evento.codigo_turma|default:evento.fot }}</title>
+            <style>
+                body { text-align: center; padding: 2rem; font-family: Arial; }
+                h2 { margin-bottom: 1rem; }
+                img { max-width: 400px; margin: 2rem 0; }
+            </style>
+        </head>
+        <body>
+            <h2>{{ evento.codigo_turma|default:evento.fot }}</h2>
+            <p>Formandos: Aponte sua câmera para o código QR abaixo</p>
+            <img src="${qrImg}" alt="QRCode">
+        </body>
+        </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.print();
+}
+</script>
+{% endblock %}

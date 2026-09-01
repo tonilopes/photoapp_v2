@@ -1,0 +1,168 @@
+{% extends "gestcaptur/base_publico.html" %}
+{% load static %}
+
+{% block title %}{{ titulo|default:"Captura de Selfie" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    html, body {
+        width: 100%;
+        height: auto;
+        overflow: auto;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    video {
+        display: none !important;
+        visibility: hidden !important;
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+    #camera-area video, #camera-area img {
+        display: block !important;
+        visibility: visible !important;
+        position: relative;
+        top: auto;
+        left: auto;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+    .selfie-wrapper {
+        width: 100vw;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        color: white;
+    }
+    .selfie-content {
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+    }
+    .selfie-title h1 {
+        font-size: clamp(28px, 8vw, 36px);
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .selfie-title p {
+        font-size: clamp(16px, 5vw, 20px);
+        opacity: 0.95;
+        margin-bottom:  ️20px;
+    }
+    .selfie-instructions {
+        background: rgba(255,255,255,0.15);
+        border-left: 4px solid #ffc107;
+        padding: 16px;
+        border-radius: 10px;
+        margin-bottom: 30px;
+        font-size: clamp(15px, 4.5vw, 17px);
+        line-height: 1.7;
+        backdrop-filter: blur(10px);
+    }
+    .selfie-instructions ul {
+        list-style: none;
+        padding:  ️0;
+        margin:  ️12px 0 0;
+        text-align: left;
+    }
+    .selfie-instructions li {
+        margin-bottom: 8px;
+    }
+    #camera-area {
+        aspect-ratio: 3 / 4;
+        width: 100%;
+        max-width: 450px;
+        max-height: 600px;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin:  ️0 auto 20px auto;
+    }
+    .btn-iniciar {
+        background: #ffc107;
+        color: #212529;
+        border: none;
+        padding: 16px 32px;
+        font-size: clamp(18px, 5vw, 22px);
+        font-weight: 700;
+        border-radius: 50px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: transform 0.2s;
+    }
+    .btn-iniciar:hover {
+        transform: scale(1.05);
+    }
+    .btn-confirmar {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding:  ️14px 28px;
+        font-size: clamp(16px, 4.5vw, 20px);
+        font-weight: 700;
+        border-radius:  ️50px;
+        cursor: pointer;
+        margin-left:  ️10px;
+    }
+    #status-msg {
+        margin-top: 16px;
+        font-size: clamp(14px, 4vw, 16px);
+        min-height:  ️24px;
+    }
+    @media (max-width: 576px) {
+        .selfie-wrapper {
+            padding: 15px;
+            min-height: auto;
+        }
+        .selfie-instructions {
+            padding:  ️14px;
+            margin-bottom: 20px;
+        }
+        .btn-iniciar {
+            padding: 14px 24px;
+        }
+        #camera-area {
+            max-width: 100%;
+            max-height: 60vh;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="selfie-wrapper">
+    <div class="selfie-content">
+        <div class="selfie-title">
+            <h1>📸 Capture sua Selfie</h1>
+            <p>Identificação obrigatória para o cadastro</p>
+        </div>
+        <div class="selfie-instructions">
+            <h3>✅ Como fazer uma boa selfie:</h3>
+            <ul>
+                <li>📷 <strong>Boa iluminação:</strong> Use iluminação frontal, evite sombras no rosto</li>
+                <li>😊 <strong>Rosto centralizado:</strong> Posicione seu rosto no centro da câmera</li>
+                <li>👀 <strong>Olhe para a câmera:</strong> Mantenha contato visual direto</li>
+                <li>🚫 <strong>Sem óculos de sol:</strong> O rosto deve ser claramente visível</li>
+            </ul>
+        </div>
+        <div id="camera-area" style="display: none;"></div>
+        <div id="status-msg" role="status" aria-live="polite">📷 Clique em "Iniciar Captura"</div>
+        <div>
+            <button type="button" class="btn-iniciar" id="btn-iniciar">📸 Iniciar Captura</button>
+            <button type="button" class="btn-confirmar" id="btn-confirmar" style="display: none;">✅ Confirmar e Finalizar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- [JS_SELFIE] -->
+{% endblock %}

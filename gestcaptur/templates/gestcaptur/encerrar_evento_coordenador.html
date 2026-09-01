@@ -1,0 +1,36 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% block title %}Encerrar Evento{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2>Encerrar Evento: {{ evento.tipo_evento }} - {{ evento.instituicao }}</h2>
+    <p>Status atual: <strong>{{ evento.get_status_display }}</strong></p>
+    <p>Total de fotos capturadas: <strong>{{ total_fotos_evento }}</strong></p>
+
+    <h4>Resumo por Fotógrafo</h4>
+    <div class="table-responsive">
+    <table class="table table-sm table-bordered">
+        <thead>
+            <tr>
+                <th>Fotógrafo</th>
+                <th>Total de Fotos</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for resumo in fotografos_resumo %}
+            <tr>
+                <td>{{ resumo.fotografo.username }}</td>
+                <td>{{ resumo.total_fotos }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+
+    <form method="post" action="{% url 'confirmar_encerrar_evento' evento.id %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Confirmar Encerramento do Evento</button>
+        <a href="{% url 'dashboard_coordenador' %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

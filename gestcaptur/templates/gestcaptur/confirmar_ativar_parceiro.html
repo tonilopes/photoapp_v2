@@ -1,0 +1,38 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load static %}
+
+{% block title %}Ativar Parceiro - {{ parceiro.username }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-play-circle"></i> Ativar Parceiro
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="mb-4">
+                        Você tem certeza que deseja <strong>ativar</strong> o parceiro <strong>"{{ parceiro.username }}"</strong>?
+                    </p>
+                    <p class="text-muted small">
+                        O parceiro conseguirá fazer login novamente e terá acesso ao painel de status dos formandos em leitura.
+                    </p>
+
+                    <form method="post" class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        {% csrf_token %}
+                        <a href="{% url 'listar_parceiros' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-play-circle"></i> Ativar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

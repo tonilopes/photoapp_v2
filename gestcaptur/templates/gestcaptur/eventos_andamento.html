@@ -1,0 +1,70 @@
+{# gestcaptur/templates/gestcaptur/eventos_andamento.html #}
+
+<div class="container mt-4">
+    <h2>Eventos em andamento</h2>
+{% if eventos %}
+    <div class="table-responsive">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>FOT</th>
+                <th>Instituição</th>
+                <th>Coordenador</th>
+                <th>Fotógrafos</th>
+                <th>Tipo de Evento</th>
+                <th>Fotos Feitas</th>
+                
+                {# NOVA COLUNA DE AÇÕES #}
+                <th>Ações</th> 
+            </tr>
+        </thead>
+        <tbody>
+            {% for evento in eventos %}
+            <tr>
+                <td>{{ evento.fot }}</td>
+                <td>{{ evento.instituicao }}</td>
+                <td>{{ evento.coordenador }}</td>
+                <td>
+                    {% for f in evento.fotografos.all %}
+                        {{ f }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </td>
+                <td>
+                    {{ evento.tipo_evento }}
+                </td>
+                <td>
+                    {{ evento.total_fotos }}
+                </td>
+
+                {# CÉLULA DE AÇÕES #}
+                <td class="text-center">
+                    <div class="btn-group" role="group" aria-label="Ações do Evento">
+                        <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-info btn-sm" title="Visualizar Alunos">
+                            <i class="bi bi-people"></i>
+                        </a>
+                        <a href="{% url 'editar_evento' evento.id %}" class="btn btn-warning btn-sm" title="Editar Evento">
+                            <i class="bi bi-pencil-square"></i>
+                        </a>
+                        <a href="{% url 'deletar_evento' evento.id %}" class="btn btn-danger btn-sm" title="Excluir Evento">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                        {% if can_finalizar_captura %}
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    onclick="finalizarCapturaEvento({{ evento.id }}, '{{ evento.tipo_evento|escapejs }}')"
+                                    title="Finalizar captura">
+                                <i class="bi bi-stop-circle"></i> Finalizar captura
+                            </button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+{% else %}
+    <div class="alert alert-warning text-center" role="alert">
+        Não existe evento em andamento no momento.
+    </div>
+{% endif %}
+</div>

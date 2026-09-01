@@ -1,0 +1,106 @@
+{# gestcaptur/templates/gestcaptur/editar_evento.html #}
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Editar Evento{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Editar Evento: <span class="text-primary">{{ evento.tipo_evento }}</span> - {{ evento.instituicao }}</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        {# Bloco para mensagens (Django messages) #}
+        {% if messages %}
+            <ul class="messages list-unstyled">
+                {% for message in messages %}
+                    <li class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {# Seus campos de formulário organizados em uma grade Bootstrap #}
+        <div class="row g-3"> {# g-3 para espaçamento (gap) entre as colunas/linhas #}
+
+            {# Campos que não são 'fotografos', 'coordenador', 'coordenador_tambem_fotografo', 'para_selfie' #}
+            {% for field in form %}
+                {% if field.name != 'fotografos' and field.name != 'coordenador' and field.name != 'coordenador_tambem_fotografo' and field.name != 'para_selfie' %}
+                    <div class="col-md-6"> {# Cada campo ocupa metade da largura em telas médias/grandes #}
+                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                        {{ field|add_class:"form-control" }} {# AQUI SIM, MANTÉM add_class #}
+                        {% if field.help_text %}
+                            <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+
+            {# Campos de seleção de fotógrafos #}
+            <div class="col-12 mt-3"> {# Ocupa a largura total #}
+                <label class="form-label d-block">{{ form.fotografos.label }}</label>
+                <div class="border p-3 rounded bg-light" style="max-height: 200px; overflow-y: auto;">
+                    {% for checkbox in form.fotografos %}
+                        <div class="form-check">
+                            {# REMOVIDO: |add_class:"form-check-input" #}
+                            {{ checkbox }} 
+                            <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                {{ checkbox.choice_label }}
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+                {% for error in form.fotografos.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            {# Campo para Coordenador #}
+            <div class="col-md-6 mt-3"> {# Ocupa metade da largura #}
+                <label for="{{ form.coordenador.id_for_label }}" class="form-label">{{ form.coordenador.label }}</label>
+                {# REMOVIDO: |add_class:"form-select" #}
+                {{ form.coordenador }} 
+                {% for error in form.coordenador.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            {# Checkbox "coordenador também fotógrafo" #}
+            <div class="col-md-6 mt-3 d-flex align-items-end"> {# Ocupa metade da largura e alinha ao final #}
+                <div class="form-check mb-3">
+                    {# REMOVIDO: |add_class:"form-check-input" #}
+                    {{ form.coordenador_tambem_fotografo }}
+                    <label class="form-check-label" for="{{ form.coordenador_tambem_fotografo.id_for_label }}">
+                        {{ form.coordenador_tambem_fotografo.label }}
+                    </label>
+                    {% for error in form.coordenador_tambem_fotografo.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# Checkbox "para_selfie" #}
+            <div class="col-md-6 mt-3 d-flex align-items-end"> {# Ocupa metade da largura e alinha ao final #}
+                <div class="form-check mb-3">
+                    {{ form.para_selfie }}
+                    <label class="form-check-label" for="{{ form.para_selfie.id_for_label }}">
+                        {{ form.para_selfie.label }} <small class="text-muted">(Permite captura de selfie pública)</small>
+                    </label>
+                    {% for error in form.para_selfie.errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div> {# Fim da div.row g-3 #}
+
+        {# Botões de ação #}
+        <div class="mt-4 d-flex justify-content-end gap-2"> {# Espaçamento superior e alinha à direita #}
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">Voltar ao Dashboard</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

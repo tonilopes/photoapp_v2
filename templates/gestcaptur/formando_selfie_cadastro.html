@@ -1,0 +1,482 @@
+{% extends 'gestcaptur/base.html' %}
+{% load static %}
+
+{% block title %}Cadastro de Formandos{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Card Principal -->
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h2 class="mb-0">📸 Cadastro de Formandos</h2>
+                    <p class="text-light mb-0 mt-2">{{ evento.fot }} - {{ evento.data|date:"d/m/Y" }}</p>
+                </div>
+
+                <div class="card-body p-5">
+                    <!-- Informações do Evento -->
+                    <div class="alert alert-info">
+                        <h5 class="alert-heading">{{ evento.instituicao }}</h5>
+                        <p class="mb-2"><strong>Curso:</strong> {{ evento.curso }}</p>
+                        <p class="mb-0"><strong>Turma:</strong> {{ evento.codigo_turma|default:"Não informada" }}</p>
+                    </div>
+
+                    <!-- Etapas do Processo -->
+                    <div class="row mb-5">
+                        <div class="col-md-6 text-center">
+                            <div class="step-box active">
+                                <div class="step-number">1</div>
+                                <p class="step-label">Selfie Obrigatória</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-center">
+                            <div class="step-box">
+                                <div class="step-number">2</div>
+                                <p class="step-label">Preenchimento do Cadastro</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instruções -->
+                    <div class="instruction-box mb-4">
+                        <h5 class="mb-3">📋 Instruções Importantes:</h5>
+                        <ul class="mb-0">
+                            <li>✅ Você precisará de uma <strong>câmera web ou câmera do celular</strong></li>
+                            <li>✅ A <strong>selfie é obrigatória</strong> para validação de identidade</li>
+                            <li>✅ Iluminação clara e rosto bem visível para melhor resultado</li>
+                            <li>✅ Após capturar a selfie, preencha <strong>todos os campos obrigatórios</strong></li>
+                            <li>✅ Após finalizar, você receberá confirmação de cadastro</li>
+                        </ul>
+                    </div>
+
+                    <!-- Botão para Iniciar -->
+                    <div class="text-center mt-5">
+                        <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#cameraModal">
+                            <i class="bi bi-camera"></i> Começar com Selfie
+                        </button>
+                    </div>
+
+                    <!-- Se for edição -->
+                    {% if aluno %}
+                    <hr class="my-4">
+                    <p class="text-muted text-center">
+                        <small>Editando cadastro de <strong>{{ aluno.nome }}</strong></small>
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="text-center mt-4">
+                <p class="text-muted">
+                    <small>Dúvidas? Entre em contato com o suporte técnico do evento.</small>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Câmera -->
+<div class="modal fade" id="cameraModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">📸 Captura de Selfie</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div class="camera-frame" id="cameraFrame">
+                    <video id="video" autoplay playsinline></video>
+                    <div class="face-guide" aria-hidden="true"></div>
+                </div>
+                <div id="cameraStatus" class="alert alert-info mt-3" role="status" aria-live="polite">
+                    Permita o acesso à câmera. Vamos orientar seu enquadramento.
+                </div>
+                
+                <div class="mt-3 mb-3">
+                    <button type="button" class="btn btn-success" id="captureBtn">
+                        <i class="bi bi-camera-fill"></i> Capturar Foto
+                    </button>
+                </div>
+
+                <!-- Canvas para armazenar foto capturada -->
+                <canvas id="canvas" style="display:none;"></canvas>
+                
+                <!-- Preview da foto capturada -->
+                <div id="preview" style="display:none;">
+                    <img id="previewImg" src="" style="width: 100%; max-width: 400px; border-radius: 10px;">
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-danger me-2" id="retakeBtn">
+                            <i class="bi bi-arrow-counterclockwise"></i> Tirar Novamente
+                        </button>
+                        <button type="button" class="btn btn-success" id="confirmBtn">
+                            <i class="bi bi-check-circle"></i> Confirmar e Continuar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.step-box {
+    padding: 20px;
+    border-radius: 10px;
+    background: #f0f0f0;
+    transition: all 0.3s;
+}
+
+.step-box.active {
+    background: #e3f2fd;
+    border: 2px solid #1976d2;
+}
+
+.step-number {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: #1976d2;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0 auto 10px;
+}
+
+.step-label {
+    font-weight: bold;
+    margin: 0;
+    color: #333;
+}
+
+.instruction-box {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    border-radius: 5px;
+}
+
+.instruction-box ul {
+    padding-left: 20px;
+}
+
+.instruction-box li {
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.camera-frame {
+    position: relative;
+    width: min(100%, 360px);
+    aspect-ratio: 3 / 4;
+    margin: 0 auto;
+    overflow: hidden;
+    background: #111;
+    border-radius: 12px;
+}
+
+.camera-frame video,
+.camera-frame img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.camera-frame video {
+    transform: scaleX(-1);
+}
+
+.face-guide {
+    position: absolute;
+    inset: 12% 15%;
+    border: 3px solid rgba(255, 255, 255, .85);
+    border-radius: 48% 48% 42% 42%;
+    pointer-events: none;
+}
+
+@media (max-width: 576px) {
+    .modal-body { padding: 12px !important; }
+    .camera-frame { width: min(100%, 320px); }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const captureBtn = document.getElementById('captureBtn');
+    const retakeBtn = document.getElementById('retakeBtn');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const preview = document.getElementById('preview');
+    const previewImg = document.getElementById('previewImg');
+    const cameraModal = document.getElementById('cameraModal');
+    const cameraStatus = document.getElementById('cameraStatus');
+    let faceDetector = null;
+    let guidanceFrame = null;
+    let faceOk = false;
+    let detectorUnavailable = false;
+    let lastSpoken = '';
+    let qualidadeAtual = { brilho: 'ok', nitidez: 'ok' };
+    let ultimaAvaliacaoQualidade = 0;
+    let analiseCanvas = null;
+    let analiseCtx = null;
+
+    // Avalia brilho médio e nitidez (desfoque) de um frame do vídeo via canvas
+    function avaliarQualidadeImagem(video) {
+        const SAMPLE_W = 96, SAMPLE_H = 96;
+        if (!analiseCanvas) {
+            analiseCanvas = document.createElement('canvas');
+            analiseCanvas.width = SAMPLE_W;
+            analiseCanvas.height = SAMPLE_H;
+            analiseCtx = analiseCanvas.getContext('2d', { willReadFrequently: true });
+        }
+        analiseCtx.drawImage(video, 0, 0, SAMPLE_W, SAMPLE_H);
+        const { data } = analiseCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
+
+        const gray = new Float32Array(SAMPLE_W * SAMPLE_H);
+        let somaBrilho = 0;
+        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+            const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            gray[p] = l;
+            somaBrilho += l;
+        }
+        const brilhoMedio = somaBrilho / gray.length;
+
+        let somaGrad = 0, somaGrad2 = 0, n = 0;
+        for (let y = 1; y < SAMPLE_H - 1; y++) {
+            for (let x = 1; x < SAMPLE_W - 1; x++) {
+                const idx = y * SAMPLE_W + x;
+                const lap = (gray[idx - 1] + gray[idx + 1] + gray[idx - SAMPLE_W] + gray[idx + SAMPLE_W]) - 4 * gray[idx];
+                somaGrad += lap;
+                somaGrad2 += lap * lap;
+                n++;
+            }
+        }
+        const media = somaGrad / n;
+        const variancia = (somaGrad2 / n) - (media * media);
+
+        return {
+            brilho: brilhoMedio < 55 ? 'escuro' : brilhoMedio > 205 ? 'claro' : 'ok',
+            nitidez: variancia < 12 ? 'borrado' : 'ok'
+        };
+    }
+
+    function speak(message) {
+        if (!('speechSynthesis' in window) || message === lastSpoken) return;
+        lastSpoken = message;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(message);
+        utterance.lang = 'pt-BR';
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function setStatus(message, type = 'info', voice = true) {
+        cameraStatus.className = 'alert alert-' + type + ' mt-3';
+        cameraStatus.textContent = message;
+        if (voice) speak(message);
+    }
+
+    async function loadFaceDetector() {
+        try {
+            const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.20/+esm');
+            const fileset = await vision.FilesetResolver.forVisionTasks(
+                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.20/wasm'
+            );
+            faceDetector = await vision.FaceDetector.createFromOptions(fileset, {
+                baseOptions: {
+                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'
+                },
+                runningMode: 'VIDEO',
+                minDetectionConfidence: 0.65
+            });
+            updateGuidance();
+        } catch (error) {
+            detectorUnavailable = true;
+            setStatus('Centralize seu rosto, olhe para a câmera e procure um local iluminado.', 'warning');
+        }
+    }
+
+    function updateGuidance() {
+        if (!faceDetector || video.readyState < 2) return;
+        const result = faceDetector.detectForVideo(video, performance.now());
+        const detections = result.detections || [];
+        faceOk = false;
+        if (!detections.length) {
+            setStatus('Nenhum rosto encontrado. Aproxime o rosto e olhe para a câmera.', 'warning');
+        } else if (detections.length > 1) {
+            setStatus('Há mais de um rosto. Fique sozinho na frente da câmera.', 'warning');
+        } else {
+            const box = detections[0].boundingBox;
+            const centerX = box.originX + box.width / 2;
+            const centerY = box.originY + box.height / 2;
+            const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * .18 &&
+                Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * .22;
+            const correctSize = box.width > video.videoWidth * .22 && box.width < video.videoWidth * .82;
+            if (!centered) {
+                setStatus('Centralize seu rosto dentro do contorno.', 'warning');
+            } else if (!correctSize) {
+                setStatus(box.width < video.videoWidth * .22 ? 'Aproxime um pouco o rosto.' : 'Afaste um pouco o rosto.', 'warning');
+            } else {
+                const agora = performance.now();
+                if (agora - ultimaAvaliacaoQualidade > 350) {
+                    ultimaAvaliacaoQualidade = agora;
+                    qualidadeAtual = avaliarQualidadeImagem(video);
+                }
+                if (qualidadeAtual.brilho === 'escuro') {
+                    setStatus('Muito escuro. Procure um local mais iluminado.', 'warning');
+                } else if (qualidadeAtual.brilho === 'claro') {
+                    setStatus('Muita luz direta. Evite luz forte atrás ou de frente pra câmera.', 'warning');
+                } else if (qualidadeAtual.nitidez === 'borrado') {
+                    setStatus('Imagem borrada. Segure o celular firme e aguarde o foco.', 'warning');
+                } else {
+                    faceOk = true;
+                    setStatus('Rosto centralizado. Você pode capturar.', 'success', false);
+                }
+            }
+        }
+        guidanceFrame = requestAnimationFrame(updateGuidance);
+    }
+
+    // Iniciar câmera ao abrir modal
+    cameraModal.addEventListener('shown.bs.modal', function() {
+        navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'user' },
+            audio: false 
+        }).then(stream => {
+            video.srcObject = stream;
+            video.play();
+            setStatus('Analise do rosto iniciando. Olhe para a câmera.', 'info', false);
+            loadFaceDetector();
+        }).catch(err => {
+            alert('Erro ao acessar câmera: ' + err.message);
+            console.error(err);
+        });
+    });
+
+    // Fechar câmera ao fechar modal
+    cameraModal.addEventListener('hidden.bs.modal', function() {
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+        }
+        if (guidanceFrame) cancelAnimationFrame(guidanceFrame);
+    });
+
+    // Capturar foto
+    captureBtn.addEventListener('click', function() {
+        if (detectorUnavailable) {
+            setStatus('Não foi possível ativar a validação facial. Verifique a conexão e tente novamente.', 'danger');
+            return;
+        }
+        if (!faceOk) {
+            setStatus('Ajuste seu rosto no contorno antes de capturar.', 'warning');
+            return;
+        }
+        const context = canvas.getContext('2d');
+        const targetWidth = 600;
+        const targetHeight = 800;
+        const sourceRatio = video.videoWidth / video.videoHeight;
+        const targetRatio = targetWidth / targetHeight;
+        let sourceWidth = video.videoWidth;
+        let sourceHeight = video.videoHeight;
+        let sourceX = 0;
+        let sourceY = 0;
+        if (sourceRatio > targetRatio) {
+            sourceWidth = video.videoHeight * targetRatio;
+            sourceX = (video.videoWidth - sourceWidth) / 2;
+        } else {
+            sourceHeight = video.videoWidth / targetRatio;
+            sourceY = (video.videoHeight - sourceHeight) / 2;
+        }
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+
+        const pixels = context.getImageData(0, 0, targetWidth, targetHeight).data;
+        let brightness = 0;
+        for (let index = 0; index < pixels.length; index += 4) {
+            brightness += (pixels[index] * .299) + (pixels[index + 1] * .587) + (pixels[index + 2] * .114);
+        }
+        brightness /= targetWidth * targetHeight;
+        if (brightness < 80) {
+            setStatus('A foto está escura. Procure um local mais iluminado.', 'warning');
+            return;
+        }
+        if (brightness > 225) {
+            setStatus('Há luz demais no rosto. Evite contraluz ou claridade direta.', 'warning');
+            return;
+        }
+
+        // Converter para blob e mostrar preview
+        canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            previewImg.src = url;
+            
+            // Armazenar blob na sessão
+            sessionStorage.setItem('selfie_blob', JSON.stringify({
+                url: url,
+                timestamp: new Date().toISOString()
+            }));
+
+            // Mostrar preview
+            video.style.display = 'none';
+            captureBtn.style.display = 'none';
+            preview.style.display = 'block';
+        }, 'image/jpeg', 0.95);
+    });
+
+    // Tirar novamente
+    retakeBtn.addEventListener('click', function() {
+        preview.style.display = 'none';
+        video.style.display = 'block';
+        captureBtn.style.display = 'block';
+    });
+
+    // Confirmar e continuar
+    confirmBtn.addEventListener('click', function() {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processando...';
+        
+        // Enviar foto para o servidor
+        canvas.toBlob(blob => {
+            const formData = new FormData();
+            formData.append('foto', blob, 'selfie.jpg');
+            formData.append('etapa', 'selfie');
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.sucesso) {
+                    // Fechar modal e esperar um segundo
+                    const modal = bootstrap.Modal.getInstance(cameraModal);
+                    modal.hide();
+                    
+                    // Aguardar um pouco antes de redirecionar
+                    setTimeout(() => {
+                        // Redirecionar para formulário de cadastro
+                        location.reload();
+                    }, 1500);
+                } else {
+                    alert('Erro: ' + data.erro);
+                    confirmBtn.disabled = false;
+                    confirmBtn.innerHTML = '<i class="bi bi-check-circle"></i> Confirmar e Continuar';
+                }
+            })
+            .catch(err => {
+                alert('Erro ao enviar foto: ' + err.message);
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<i class="bi bi-check-circle"></i> Confirmar e Continuar';
+            });
+        }, 'image/jpeg', 0.95);
+    });
+});
+</script>
+{% endblock %}

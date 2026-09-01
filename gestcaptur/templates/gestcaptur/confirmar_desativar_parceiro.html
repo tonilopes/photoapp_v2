@@ -1,0 +1,39 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load static %}
+
+{% block title %}Desativar Parceiro - {{ parceiro.username }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">
+                        <i class="bi bi-pause-circle"></i> Desativar Parceiro
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="mb-4">
+                        Você tem certeza que deseja <strong>desativar</strong> o parceiro <strong>"{{ parceiro.username }}"</strong>?
+                    </p>
+                    <p class="text-muted small">
+                        O parceiro <strong>perderá acesso ao sistema</strong> e não conseguirá mais fazer login. 
+                        Você pode reativá-lo a qualquer momento.
+                    </p>
+
+                    <form method="post" class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        {% csrf_token %}
+                        <a href="{% url 'listar_parceiros' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-warning text-dark">
+                            <i class="bi bi-pause-circle"></i> Desativar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

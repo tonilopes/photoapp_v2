@@ -1,0 +1,448 @@
+{% extends 'gestcaptur/base_fotografo.html' %}
+{% load static %}
+
+{% block title %}Alunos - {{ evento.tipo_evento }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Estilos para a câmera - para proporcionar interface responsiva */
+    .camera-container {
+        position: relative;
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .camera-container video {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .camera-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+    }
+
+    .camera-frame-34 {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .frame-guide {
+        width: 85%;
+        aspect-ratio: 3 / 4;
+        border: 3px dashed rgba(255, 255, 255, 0.7);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.1);
+        position: relative;
+    }
+
+    .frame-guide::before,
+    .frame-guide::after {
+        content: '';
+        position: absolute;
+        background: rgba(255, 255, 255, 0.8);
+    }
+
+    .frame-guide::before {
+        width: 30px;
+        height: 30px;
+        border-top: 3px solid;
+        border-left: 3px solid;
+        top: 10px;
+        left: 10px;
+    }
+
+    .frame-guide::after {
+        width: 30px;
+        height: 30px;
+        border-bottom: 3px solid;
+        border-right: 3px solid;
+        bottom: 10px;
+        right: 10px;
+    }
+
+    .guide-text {
+        font-size: 14px;
+        font-weight: bold;
+        color: rgba(255, 255, 255, 0.9);
+        text-align: center;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .foto-preview {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .preview-container {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .preview-container img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .preview-info {
+        text-align: center;
+        padding: 10px;
+        background-color: #f5f5f5;
+        font-size: 12px;
+        color: #666;
+    }
+
+    #camera-area {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 400px;
+    }
+
+    /* ========== ESTILOS PARA AVATAR DO ALUNO ========== */
+    .aluno-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid #e0e0e0;
+        object-fit: cover;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    .aluno-avatar:hover {
+        transform: scale(1.2);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+
+    .aluno-avatar.com-foto {
+        border-color: #28a745;
+        box-shadow: 0 0 0 1px rgba(40, 167, 69, 0.2);
+    }
+
+    .aluno-avatar-placeholder {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: 1px solid #e0e0e0;
+        background-color: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #6c757d;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Meta tag para CSRF token -->
+<meta name="csrf-token" content="{{ csrf_token }}">
+
+<div class="container-fluid">
+    <!-- Header com navegação -->
+    <div class="row bg-primary text-white p-3 mb-3">
+        <div class="col-2">
+            <a href="javascript:history.back()" class="btn btn-light btn-sm">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+        </div>
+        <div class="col-8 text-center">
+            <h5 class="mb-0">{{ evento.tipo_evento }}</h5>
+        </div>
+        <div class="col-2 text-end">
+            {% if request.user.is_fotografo %}
+            <a href="{% url 'aluno_novo' %}?evento={{ evento.id }}" class="btn btn-success btn-sm">
+                <i class="bi bi-plus"></i>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+  
+
+    <!-- Status Message -->
+    {% if evento_status_message %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> {{ evento_status_message }}
+    </div>
+    {% endif %}
+
+    <!-- Lista de Alunos - FORMATO LISTA SIMPLES -->
+    {% for aluno in alunos %}
+    <div class="card mb-2 {% if aluno.status_comparecimento == 'faltoso' %}border-danger bg-light{% endif %}" id="aluno-{{ aluno.id }}">
+        <div class="card-body py-2">
+            <div class="row align-items-center">
+                <!-- Nome do Aluno com Avatar -->
+                <div class="col">
+                    <div class="d-flex align-items-center">
+                        {% if aluno.foto %}
+                        <img 
+                            src="{{ aluno.foto.url }}"
+                            alt="Foto de {{ aluno.nome }}"
+                            class="aluno-avatar com-foto"
+                            data-bs-toggle="modal"
+                            data-bs-target="#fotoModal{{ aluno.id }}"
+                            title="Clique para ampliar"
+                        >
+                        {% else %}
+                        <i class="bi bi-person-circle text-secondary me-2" style="font-size: 1.2rem;"></i>
+                        {% endif %}
+                        <span class="fw-bold {% if aluno.status_comparecimento == 'faltoso' %}text-decoration-line-through text-muted{% endif %}">
+                            {{ aluno.nome }}
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Botões de Ação -->
+                <div class="col-auto">
+                    <div class="d-flex gap-1">
+                        <!-- Fotografar -->
+                        {% if request.user.is_fotografo %}
+                        <button 
+                            class="btn btn-primary btn-sm js-abrir-camera"
+                            data-aluno-id="{{ aluno.id }}"
+                            data-evento-id="{{ evento.id }}"
+                            data-aluno-nome="{{ aluno.nome }}"
+                            {% if not can_upload_photos or aluno.status_comparecimento == 'faltoso' %}disabled{% endif %}
+                            title="{% if can_upload_photos %}Fotografar{% else %}Evento não liberado para fotografar{% endif %}"
+                        >
+                            <i class="bi bi-camera"></i>
+                        </button>
+                        {% endif %}
+
+                        <!-- QR Code -->
+                        {% if request.user.is_coordenador or request.user.is_gestor or request.user.is_fotografo %}
+                        <button 
+                            class="btn btn-info btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#qrModal{{ aluno.id }}"
+                            title="QR Code do aluno"
+                        >
+                            <i class="bi bi-qr-code"></i>
+                        </button>
+                        {% endif %}
+
+                        <!-- Ficha -->
+                        {% if request.user.is_gestor or request.user.is_coordenador or request.user.is_pesquisa %}
+                        <button 
+                            class="btn btn-success btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#fichaModal{{ aluno.id }}"
+                            title="Ficha do aluno"
+                        >
+                            <i class="bi bi-file-text"></i>
+                        </button>
+                        {% endif %}
+
+                        <!-- Faltoso -->
+                        {% if request.user.is_gestor or request.user.is_coordenador or request.user.is_fotografo %}
+                        <button 
+                            class="btn btn-sm {% if aluno.status_comparecimento == 'faltoso' %}btn-danger{% else %}btn-outline-danger{% endif %}"
+                            onclick="marcarFaltoso({{ aluno.id }}, '{{ aluno.nome|escapejs }}', '{% if aluno.status_comparecimento == 'faltoso' %}presente{% else %}faltoso{% endif %}')"
+                            title="{% if aluno.status_comparecimento == 'faltoso' %}Marcar como presente{% else %}Marcar como faltoso{% endif %}"
+                        >
+                            <i class="bi bi-person-x"></i>
+                        </button>
+                        {% endif %}
+
+                        <!-- Excluir Aluno (somente superuser) -->
+                        {% if request.user.is_superuser %}
+                        <form method="post" action="{% url 'aluno_excluir' aluno.id %}" style="display:inline;" onsubmit="return confirm('Excluir o aluno {{ aluno.nome|escapejs }}? Esta ação não pode ser desfeita.');">
+                            {% csrf_token %}
+                            <button class="btn btn-dark btn-sm" title="Excluir aluno (somente superuser)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para visualizar foto em tamanho maior -->
+    {% if aluno.foto %}
+    <div class="modal fade" id="fotoModal{{ aluno.id }}" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">{{ aluno.nome }}</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="{{ aluno.foto.url }}" alt="Foto de {{ aluno.nome }}" class="img-fluid" style="max-height: 500px; border-radius: 8px;">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Modal QR -->
+    <div class="modal fade" id="qrModal{{ aluno.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">QR - {{ aluno.nome }}</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ request.build_absolute_uri }}{% url 'aluno_cadastro_publico_editar' aluno.id aluno.token %}" class="img-fluid">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ficha -->
+    <div class="modal fade" id="fichaModal{{ aluno.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">{{ aluno.nome }}</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>CPF:</strong> {{ aluno.cpf|default:"-" }}</p>
+                    <p><strong>Email:</strong> {{ aluno.email|default:"-" }}</p>
+                    <p><strong>WhatsApp:</strong> {{ aluno.whatsapp|default:"-" }}</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge {% if aluno.status_comparecimento == 'faltoso' %}bg-danger{% else %}bg-success{% endif %}">
+                            {{ aluno.get_status_comparecimento_display }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Modal Câmera -->
+<div class="modal fade" id="cameraModal" tabindex="-1" aria-labelledby="cameraModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cameraModalLabel">Fotografar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="aluno-info" class="mb-3 fw-bold text-primary"></div>
+                <div id="camera-area">
+                    <!-- Área da câmera será inserida aqui pelo JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer" id="camera-modal-footer">
+                <!-- Botões serão inseridos aqui pelo JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'gestcaptur/js/masks.js' %}"></script>
+<script src="{% static 'gestcaptur/js/fotografar.js' %}"></script>
+
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Função melhorada para pegar CSRF token
+function getCSRFToken() {
+    // Tenta pegar do cookie primeiro
+    let token = getCookie('csrftoken');
+    
+    // Se não encontrar no cookie, tenta pegar do meta tag
+    if (!token) {
+        const metaTag = document.querySelector('meta[name=csrf-token]');
+        if (metaTag) {
+            token = metaTag.getAttribute('content');
+        }
+    }
+    
+    // Se ainda não encontrar, tenta pegar de um input hidden
+    if (!token) {
+        const hiddenInput = document.querySelector('input[name=csrfmiddlewaretoken]');
+        if (hiddenInput) {
+            token = hiddenInput.value;
+        }
+    }
+    
+    return token;
+}
+
+// Atualize a função marcarFaltoso:
+function marcarFaltoso(alunoId, alunoNome, actionType) {
+    if (confirm(`Marcar ${alunoNome} como ${actionType.toUpperCase()}?`)) {
+        const csrfToken = getCSRFToken();
+        
+        if (!csrfToken) {
+            alert('Erro: Token de segurança não encontrado. Recarregue a página.');
+            return;
+        }
+        
+        fetch(`/aluno/${alunoId}/marcar_faltoso/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ action: actionType })
+        })
+        .then(response => {
+            if (response.status === 403) {
+                alert('Sessão expirada. Recarregando a página...');
+                location.reload();
+                return;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.status === 'ok') {
+                location.reload();
+            } else {
+                alert('Erro: ' + (data ? data.message : 'Resposta inválida'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro de rede. Verifique sua conexão.');
+        });
+    }
+}
+</script>
+{% endblock %}

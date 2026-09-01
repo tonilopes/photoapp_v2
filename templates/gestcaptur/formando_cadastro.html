@@ -1,0 +1,522 @@
+{% extends 'gestcaptur/base.html' %}
+{% load static %}
+
+{% block title %}Formulário de Cadastro - Formandos{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Card do Formulário -->
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white py-4">
+                    <h3 class="mb-0">
+                        <i class="bi bi-pencil-square"></i> Preencha Seu Cadastro
+                    </h3>
+                    <small class="text-light">Etapa 2 de 2 - Formulário Pessoal</small>
+                </div>
+
+                <div class="card-body p-4">
+                    <!-- Barra de Progresso -->
+                    <div class="progress mb-4" style="height: 5px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+
+                    <!-- Mensagem de Sucesso da Selfie -->
+                    <div class="alert alert-success mb-4">
+                        <i class="bi bi-check-circle"></i> Selfie capturada com sucesso! Agora complete seus dados abaixo.
+                    </div>
+
+                    <!-- Formulário -->
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="hidden" name="etapa" value="cadastro">
+                        <input type="hidden" id="campo-evento-id" value="{{ evento.id|default:'' }}">
+                        <input type="hidden" id="campo-aluno-id" value="{{ aluno.id|default:'' }}">
+
+                        <!-- Seção 1: Dados Pessoais -->
+                        <h5 class="mt-4 mb-3">👤 Dados Pessoais</h5>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                {{ form.nome.label_tag }}
+                                {{ form.nome }}
+                                {% if form.nome.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.nome.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.cpf.label_tag }}
+                                {{ form.cpf }}
+                                {% if form.cpf.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.cpf.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                {{ form.data_nascimento.label_tag }}
+                                {{ form.data_nascimento }}
+                                {% if form.data_nascimento.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.data_nascimento.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Seção 2: Contatos -->
+                        <h5 class="mt-4 mb-3">📱 Contatos</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.whatsapp.label_tag }}
+                                {{ form.whatsapp }}
+                                <small class="text-muted">Com DDD (ex: 11 99999-9999)</small>
+                                {% if form.whatsapp.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.whatsapp.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                {{ form.telefone_fixo.label_tag }}
+                                {{ form.telefone_fixo }}
+                                {% if form.telefone_fixo.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.telefone_fixo.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.email.label_tag }}
+                                {{ form.email }}
+                                {% if form.email.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.email.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                {{ form.instagram.label_tag }}
+                                {{ form.instagram }}
+                                {% if form.instagram.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.instagram.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Seção 3: Endereço -->
+                        <h5 class="mt-4 mb-3">🏠 Endereço</h5>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.cep.label_tag }}
+                                {{ form.cep }}
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                {{ form.endereco.label_tag }}
+                                {{ form.endereco }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.numero.label_tag }}
+                                {{ form.numero }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.bairro.label_tag }}
+                                {{ form.bairro }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.complemento.label_tag }}
+                                {{ form.complemento }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.cidade.label_tag }}
+                                {{ form.cidade }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.estado.label_tag }}
+                                {{ form.estado }}
+                            </div>
+                        </div>
+
+                        <!-- Seção 4: Familiares -->
+                        <h5 class="mt-4 mb-3">👨‍👩‍👧 Familiares</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.nome_mae.label_tag }}
+                                {{ form.nome_mae }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.whatsapp_mae.label_tag }}
+                                {{ form.whatsapp_mae }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.nome_pai.label_tag }}
+                                {{ form.nome_pai }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.whatsapp_pai.label_tag }}
+                                {{ form.whatsapp_pai }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.nome_parente.label_tag }}
+                                {{ form.nome_parente }}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                {{ form.grau_parentesco.label_tag }}
+                                {{ form.grau_parentesco }}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                {{ form.whatsapp_parente.label_tag }}
+                                {{ form.whatsapp_parente }}
+                            </div>
+                        </div>
+
+                        <!-- Avisos de Campos Obrigatórios -->
+                        <div class="alert alert-info mt-4 mb-4">
+                            <small>
+                                <strong>* Campos obrigatórios</strong>
+                            </small>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-grid gap-2 d-sm-flex justify-content-sm-end mt-5">
+                            <button type="reset" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-counterclockwise"></i> Limpar Formulário
+                            </button>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-circle"></i> Finalizar Cadastro
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-control, .form-select {
+    border-radius: 5px;
+    border: 1px solid #ddd;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #0066cc;
+    box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25);
+}
+
+.form-label {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.text-danger {
+    color: #dc3545;
+    font-weight: bold;
+}
+</style>
+
+<script>
+// 🎯 FUNÇÕES AUXILIARES
+function validarCPF(cpf) {
+    cpf = cpf.replace(/\D/g, '');
+    if (cpf.length !== 11) return false;
+    if (/^(\d)\1{10}$/.test(cpf)) return false;
+    
+    let soma = 0;
+    let resto;
+    
+    for (let i = 1; i <= 9; i++) {
+        soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+    }
+    
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11) resto = 0;
+    if (resto !== parseInt(cpf.substring(9, 10))) return false;
+    
+    soma = 0;
+    for (let i = 1; i <= 10; i++) {
+        soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+    }
+    
+    resto = (soma * 10) % 11;
+    if (resto === 10 || resto === 11) resto = 0;
+    if (resto !== parseInt(cpf.substring(10, 11))) return false;
+    
+    return true;
+}
+
+// 🎯 MÁSCARAS DE ENTRADA
+document.addEventListener('DOMContentLoaded', function() {
+    // CPF: XXX.XXX.XXX-XX com validação em tempo real
+    const cpfInput = document.querySelector('[name="cpf"]');
+    if (cpfInput) {
+        // Armazenar último valor de dígitos
+        let ultimosDigitos = '';
+        
+        // Função para aplicar máscara
+        function aplicarMascaraCPF(value) {
+            value = value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            
+            if (value.length > 8) {
+                value = value.slice(0, 3) + '.' + value.slice(3, 6) + '.' + value.slice(6, 9) + '-' + value.slice(9);
+            } else if (value.length > 5) {
+                value = value.slice(0, 3) + '.' + value.slice(3, 6) + '.' + value.slice(6);
+            } else if (value.length > 2) {
+                value = value.slice(0, 3) + '.' + value.slice(3);
+            }
+            return value;
+        }
+        
+        cpfInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace') {
+                // Remover validação ao começar a editar
+                cpfInput.classList.remove('is-invalid', 'is-valid');
+                
+                // Pegar dígitos atuais
+                let digitos = cpfInput.value.replace(/\D/g, '');
+                
+                // Se temos dígitos, remover o último
+                if (digitos.length > 0) {
+                    digitos = digitos.slice(0, -1);
+                    cpfInput.value = aplicarMascaraCPF(digitos);
+                } else {
+                    cpfInput.value = '';
+                }
+                
+                e.preventDefault();
+            }
+        });
+        
+        cpfInput.addEventListener('input', function(e) {
+            let value = e.target.value;
+            e.target.value = aplicarMascaraCPF(value);
+        });
+        
+        // Validação ao sair do campo
+        cpfInput.addEventListener('blur', function() {
+            const cpf = cpfInput.value;
+            if (cpf && cpf.replace(/\D/g, '').length === 11) {
+                if (!validarCPF(cpf)) {
+                    cpfInput.classList.add('is-invalid');
+                    cpfInput.classList.remove('is-valid');
+                    
+                    // Remover mensagem anterior se existir
+                    const feedback = cpfInput.parentElement.querySelector('.invalid-feedback');
+                    if (feedback) feedback.remove();
+                    
+                    const erro = document.createElement('div');
+                    erro.className = 'invalid-feedback d-block';
+                    erro.textContent = 'CPF inválido!';
+                    cpfInput.parentElement.appendChild(erro);
+                } else {
+                    cpfInput.classList.remove('is-invalid');
+                    cpfInput.classList.add('is-valid');
+                    
+                    // Remover mensagem de erro
+                    const feedback = cpfInput.parentElement.querySelector('.invalid-feedback');
+                    if (feedback) feedback.remove();
+                }
+            }
+        });
+    }
+
+    // CEP: XXXXX-XXX com busca automática e backspace melhorado
+    const cepInput = document.querySelector('[name="cep"]');
+    if (cepInput) {
+        function aplicarMascaraCEP(value) {
+            value = value.replace(/\D/g, '');
+            if (value.length > 8) value = value.slice(0, 8);
+            
+            if (value.length > 5) {
+                value = value.slice(0, 5) + '-' + value.slice(5);
+            }
+            return value;
+        }
+        
+        cepInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace') {
+                let digitos = cepInput.value.replace(/\D/g, '');
+                if (digitos.length > 0) {
+                    digitos = digitos.slice(0, -1);
+                    cepInput.value = aplicarMascaraCEP(digitos);
+                } else {
+                    cepInput.value = '';
+                }
+                e.preventDefault();
+            }
+        });
+        
+        cepInput.addEventListener('input', function(e) {
+            e.target.value = aplicarMascaraCEP(e.target.value);
+            
+            // Se CEP completo, buscar endereço
+            if (e.target.value.replace(/\D/g, '').length === 8) {
+                buscarCEP(e.target.value.replace(/\D/g, ''));
+            }
+        });
+    }
+
+    // Função para buscar CEP via ViaCEP
+    function buscarCEP(cep) {
+        fetch(`https://viacep.com.br/ws/${cep}/json/`)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.erro) {
+                    // Preencher campos automaticamente
+                    const enderecoInput = document.querySelector('[name="endereco"]');
+                    const bairroInput = document.querySelector('[name="bairro"]');
+                    const cidadeInput = document.querySelector('[name="cidade"]');
+                    const estadoInput = document.querySelector('[name="estado"]');
+                    
+                    if (enderecoInput) enderecoInput.value = data.logradouro || '';
+                    if (bairroInput) bairroInput.value = data.bairro || '';
+                    if (cidadeInput) cidadeInput.value = data.localidade || '';
+                    if (estadoInput) estadoInput.value = data.uf || '';
+                    
+                    // Focar no campo número para o usuário continuar preenchendo
+                    const numeroInput = document.querySelector('[name="numero"]');
+                    if (numeroInput) numeroInput.focus();
+                } else {
+                    alert('CEP não encontrado!');
+                }
+            })
+            .catch(err => {
+                console.error('Erro ao buscar CEP:', err);
+            });
+    }
+
+    // WhatsApp: (XX) XXXXX-XXXX
+    const whatsappInputs = document.querySelectorAll('[name*="whatsapp"]');
+    whatsappInputs.forEach(input => {
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 11) value = value.slice(0, 11);
+            
+            if (value.length > 7) {
+                value = '(' + value.slice(0, 2) + ') ' + value.slice(2, 7) + '-' + value.slice(7);
+            } else if (value.length > 2) {
+                value = '(' + value.slice(0, 2) + ') ' + value.slice(2);
+            } else if (value.length > 0) {
+                value = '(' + value;
+            }
+            e.target.value = value;
+        });
+    });
+
+    // Telefone Fixo: (XX) XXXX-XXXX
+    const telefoneInput = document.querySelector('[name="telefone_fixo"]');
+    if (telefoneInput) {
+        telefoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 10) value = value.slice(0, 10);
+            
+            if (value.length > 6) {
+                value = '(' + value.slice(0, 2) + ') ' + value.slice(2, 6) + '-' + value.slice(6);
+            } else if (value.length > 2) {
+                value = '(' + value.slice(0, 2) + ') ' + value.slice(2);
+            } else if (value.length > 0) {
+                value = '(' + value;
+            }
+            e.target.value = value;
+        });
+    }
+
+    // Data de Nascimento: DD/MM/AAAA
+    const dataInput = document.querySelector('[name="data_nascimento"]');
+    if (dataInput) {
+        dataInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 8) value = value.slice(0, 8);
+            
+            if (value.length > 4) {
+                value = value.slice(0, 2) + '/' + value.slice(2, 4) + '/' + value.slice(4);
+            } else if (value.length > 2) {
+                value = value.slice(0, 2) + '/' + value.slice(2);
+            }
+            e.target.value = value;
+        });
+    }
+});
+
+    // =====================================================================
+    // VALIDAÇÃO DE CPF DUPLICADO NO EVENTO (via AJAX ao sair do campo)
+    // =====================================================================
+    const cpfInput = document.getElementById('id_cpf');
+    if (cpfInput) {
+        cpfInput.addEventListener('blur', function() {
+            const cpfRaw = this.value.replace(/\D/g, '');
+            if (cpfRaw.length !== 11) return;
+            const eventoId = document.getElementById('campo-evento-id').value;
+            if (!eventoId) return;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            fetch('/api/verificar-cpf/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': csrfToken},
+                body: 'cpf=' + encodeURIComponent(cpfRaw) + '&evento_id=' + encodeURIComponent(eventoId) + '&csrfmiddlewaretoken=' + encodeURIComponent(csrfToken)
+            })
+            .then(r => r.json())
+            .then(data => {
+                // remover feedback anterior
+                const prev = cpfInput.parentElement.querySelector('.invalid-feedback-cpf');
+                if (prev) prev.remove();
+                cpfInput.classList.remove('is-invalid', 'is-valid');
+                if (data.exists) {
+                    cpfInput.classList.add('is-invalid');
+                    const msg = document.createElement('div');
+                    msg.className = 'invalid-feedback d-block invalid-feedback-cpf';
+                    msg.textContent = 'CPF j\u00e1 cadastrado neste evento. Insira outro ou fale com nossa equipe.';
+                    cpfInput.parentElement.appendChild(msg);
+                } else {
+                    cpfInput.classList.add('is-valid');
+                }
+            })
+            .catch(() => {});
+        });
+    }
+
+    // =====================================================================
+    // VALIDAÇÃO DE WHATSAPP DUPLICADO (local, ao sair do campo)
+    // =====================================================================
+    const whatsappSelectors = ['id_whatsapp', 'id_whatsapp_mae', 'id_whatsapp_pai', 'id_whatsapp_parente'];
+    whatsappSelectors.forEach(function(fieldId) {
+        const el = document.getElementById(fieldId);
+        if (!el) return;
+        el.addEventListener('blur', function() {
+            const valorAtual = this.value.replace(/\D/g, '');
+            // remover feedback anterior
+            const prev = this.parentElement.querySelector('.invalid-feedback-wa');
+            if (prev) prev.remove();
+            this.classList.remove('is-invalid');
+            if (!valorAtual || valorAtual.length < 11) return;
+            let duplicado = false;
+            whatsappSelectors.forEach(function(otherId) {
+                if (otherId === fieldId) return;
+                const outro = document.getElementById(otherId);
+                if (outro && outro.value.replace(/\D/g, '') === valorAtual) {
+                    duplicado = true;
+                }
+            });
+            if (duplicado) {
+                el.classList.add('is-invalid');
+                const msg = document.createElement('div');
+                msg.className = 'invalid-feedback d-block invalid-feedback-wa';
+                msg.textContent = 'N\u00famero j\u00e1 informado em outro campo WhatsApp. Use n\u00fameros diferentes.';
+                el.parentElement.appendChild(msg);
+            }
+        });
+    });
+</script>
+{% endblock %}

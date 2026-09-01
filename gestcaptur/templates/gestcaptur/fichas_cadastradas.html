@@ -1,0 +1,89 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% block title %}Fichas Cadastradas{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2>Fichas Cadastradas</h2>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-2">
+            <input type="text" name="fot" class="form-control" placeholder="Fot" value="{{ filtros.fot }}">
+        </div>
+        <div class="col-md-3">
+            <input type="text" name="empresa" class="form-control" placeholder="Empresa" value="{{ filtros.empresa }}">
+        </div>
+        <div class="col-md-3">
+            <input type="text" name="tipo_evento" class="form-control" placeholder="Tipo de Evento" value="{{ filtros.tipo_evento }}">
+        </div>
+        <div class="col-md-2">
+            <input type="date" name="data" class="form-control" value="{{ filtros.data }}">
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">🔎 Filtrar</button>
+            <a href="{% url 'fichas_cadastradas' %}" class="btn btn-outline-secondary">✖ Limpar</a>
+        </div>
+    </form>
+
+    <form method="get" action="{% url 'exportar_fichas' %}">
+        <div class="mb-3">
+            <label for="eventoSelect" class="form-label">Exportar fichas de:</label>
+            <select name="evento_id" id="eventoSelect" class="form-select d-inline w-auto">
+                <option value="">Selecione o evento</option>
+                {% for key, alunos_evento in eventos.items %}
+                    <option value="{{ key.0 }}">{{ key.1 }} - {{ key.2 }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-success ms-2">⬇ Exportar XLSX</button>
+        </div>
+    </form>
+
+    <div class="accordion" id="accordionEventos">
+        {% for key, alunos_evento in eventos.items %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ key.0 }}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ key.0 }}" aria-expanded="false" aria-controls="collapse{{ key.0 }}">
+                    {{ key.1 }} - {{ key.2 }}
+                </button>
+            </h2>
+            <div id="collapse{{ key.0 }}" class="accordion-collapse collapse" aria-labelledby="heading{{ key.0 }}" data-bs-parent="#accordionEventos">
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Foto</th>
+                                    <th>Nome</th>
+                                    <th>Email</th>
+                                    <th>Whatsapp</th>
+                                    <!-- Adicione outros campos -->
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for aluno in alunos_evento %}
+                                <tr>
+                                    <td>
+                                        {% if aluno.foto %}
+                                            <img src="{{ aluno.foto.url }}" alt="Foto" style="width:48px; height:48px; object-fit:cover; border-radius:6px;">
+                                        {% else %}
+                                            <span class="text-muted">Sem foto</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ aluno.nome }}</td>
+                                    <td>{{ aluno.email }}</td>
+                                    <td>{{ aluno.whatsapp }}</td>
+                                    <!-- Outros campos -->
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted">Nenhuma ficha cadastrada.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="alert alert-info mt-4">Nenhuma ficha cadastrada encontrada.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

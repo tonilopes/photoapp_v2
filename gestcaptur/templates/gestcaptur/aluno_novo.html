@@ -1,0 +1,17 @@
+{% extends 'gestcaptur/base_fotografo.html' %}
+{% block title %}Novo Aluno{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h3>Novo Aluno para o Evento: {{ evento.tipo_evento }} ({{ evento.empresa }})</h3>
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="nome" class="form-label">Nome do Aluno</label>
+            <input type="text" class="form-control" id="nome" name="nome" required>
+        </div>
+        <button type="submit" class="btn btn-success">Salvar</button>
+        <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

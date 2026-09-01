@@ -1,0 +1,257 @@
+{% extends 'gestcaptur/base_coordenador.html' %}
+{% load static %}
+
+{% block title %}Dashboard Coordenador-Fotógrafo{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">
+            <i class="bi bi-person-gear"></i> + <i class="bi bi-camera"></i> 
+            Dashboard Coordenador-Fotógrafo
+        </h1>
+
+    <!-- Alertas informativos -->
+    <div class="alert alert-success">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <i class="bi bi-star-fill"></i>
+                <strong>Modo Híbrido Ativo!</strong> 
+                Você tem acesso completo às funções de coordenação e fotografia.
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'dashboard_coordenador' %}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-person-gear"></i> Dashboard Coordenador
+                </a>
+                <a href="{% url 'fotografo_dashboard' %}" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-camera"></i> Dashboard Fotógrafo
+                </a>
+            </div>
+        </div>
+    </div>
+    
+
+        <div class="d-flex gap-2">
+            <div class="badge bg-info fs-6">
+                <i class="bi bi-camera-fill"></i> 
+                {% if total_fotos_capturadas is not None %}
+                    {{ total_fotos_capturadas }}
+                {% else %}
+                    0
+                {% endif %} 
+                fotos capturadas
+            </div>
+            <div class="badge bg-secondary fs-6">
+                <i class="bi bi-collection"></i> 
+                {% if total_sessoes is not None %}
+                    {{ total_sessoes }}
+                {% else %}
+                    0
+                {% endif %} 
+                sessões
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Alertas informativos -->
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        <strong>Modo Híbrido Ativo!</strong> 
+        Você tem acesso tanto às funções de coordenação quanto às de fotografia nos eventos marcados.
+    </div>
+
+    <!-- Abas do Dashboard -->
+    <ul class="nav nav-tabs mb-3" id="dashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="hibrido-tab" data-bs-toggle="tab" data-bs-target="#hibrido" type="button" role="tab">
+                <i class="bi bi-star-fill"></i> Coordenador + Fotógrafo
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="coordenacao-tab" data-bs-toggle="tab" data-bs-target="#coordenacao" type="button" role="tab">
+                <i class="bi bi-person-gear"></i> Apenas Coordenação
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="fotografia-tab" data-bs-toggle="tab" data-bs-target="#fotografia" type="button" role="tab">
+                <i class="bi bi-camera"></i> Apenas Fotografia
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="dashboardTabsContent">
+
+
+        <!-- Aba: Eventos Híbridos -->
+        <div class="tab-pane fade show active" id="hibrido" role="tabpanel">
+            {% if eventos_hibridos_info %}
+                {% for item in eventos_hibridos_info %}
+                {% with evento=item.evento %}
+                <div class="card mb-4 shadow border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-star-fill"></i>
+                                {{ evento.tipo_evento }} - {{ evento.instituicao }}
+                                <span class="badge bg-dark ms-2">HÍBRIDO</span>
+                            </h5>
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-info">
+                                    <i class="bi bi-camera-fill"></i> {{ item.fotos_capturadas }} fotos
+                                </span>
+                                <span class="badge bg-light text-dark">
+                                    <i class="bi bi-calendar"></i> {{ evento.data|date:"d/m/Y" }}
+                                </span>
+                                <span class="badge bg-{% if evento.status == 'iniciado' %}success{% elif evento.status == 'pendente' %}secondary{% else %}dark{% endif %}">
+                                    {{ evento.get_status_display }}
+                                </span>
+                                {% if item.sessao_ativa %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-record-circle"></i> Sessão Ativa
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <p><strong>Local:</strong> {{ evento.local }}</p>
+                                <p><strong>Horário:</strong> {{ evento.horario }}</p>
+                                <p><strong>Total de Alunos:</strong> {{ evento.total_alunos }}</p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <div class="btn-group-vertical d-grid gap-2">
+                                    <!-- Funções de Coordenação -->
+                                    <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-people"></i> Gerenciar Alunos
+                                    </a>
+                                    
+                                    {% if evento.status == 'pendente' %}
+                                        <button class="btn btn-success btn-sm" onclick="iniciarEvento({{ evento.id }})">
+                                            <i class="bi bi-play-circle"></i> Iniciar Evento
+                                        </button>
+                                    {% elif evento.status == 'iniciado' %}
+                                        <!-- Funções de Fotografia -->
+                                        <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-warning btn-sm">
+                                            <i class="bi bi-camera-fill"></i> Fotografar Alunos
+                                        </a>
+                                        <button class="btn btn-danger btn-sm" onclick="finalizarEvento({{ evento.id }})">
+                                            <i class="bi bi-stop-circle"></i> Finalizar Evento
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-star"></i>
+                    <h5>Nenhum evento híbrido</h5>
+                    <p>Você não está escalado como coordenador-fotógrafo em nenhum evento no momento.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Aba: Apenas Coordenação -->
+        <div class="tab-pane fade" id="coordenacao" role="tabpanel">
+            {% if eventos_coordenacao %}
+                {% for evento in eventos_coordenacao %}
+                <div class="card mb-3 shadow border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-person-gear"></i>
+                            {{ evento.tipo_evento }} - {{ evento.instituicao }}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <small><strong>Data:</strong> {{ evento.data|date:"d/m/Y" }} | <strong>Local:</strong> {{ evento.local }}</small>
+                            </div>
+                            <div>
+                                <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-people"></i> Gerenciar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-secondary text-center">
+                    <i class="bi bi-person-gear"></i>
+                    <p>Nenhum evento apenas como coordenador.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Aba: Apenas Fotografia -->
+        <div class="tab-pane fade" id="fotografia" role="tabpanel">
+            {% if eventos_fotografia %}
+                {% for evento in eventos_fotografia %}
+                <div class="card mb-3 shadow border-info">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-camera"></i>
+                            {{ evento.tipo_evento }} - {{ evento.instituicao }}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <small><strong>Data:</strong> {{ evento.data|date:"d/m/Y" }} | <strong>Local:</strong> {{ evento.local }}</small>
+                            </div>
+                            <div>
+                                <a href="{% url 'evento_alunos' evento.id %}" class="btn btn-info btn-sm">
+                                    <i class="bi bi-camera-fill"></i> Fotografar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-secondary text-center">
+                    <i class="bi bi-camera"></i>
+                    <p>Nenhum evento apenas como fotógrafo.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function iniciarEvento(eventoId) {
+    if (confirm('Iniciar este evento?')) {
+        fetch(`/iniciar-evento-coordenador/${eventoId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        });
+    }
+}
+
+function finalizarEvento(eventoId) {
+    if (confirm('Finalizar este evento?')) {
+        window.location.href = `/encerrar-evento/${eventoId}/`;
+    }
+}
+</script>
+{% endblock %}

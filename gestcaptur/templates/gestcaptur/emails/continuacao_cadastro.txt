@@ -1,0 +1,20 @@
+PhotoApp - Complete seu cadastro
+
+Olá, {{ aluno.nome }}!
+
+Você iniciou seu cadastro no PhotoApp, mas ainda faltam alguns dados obrigatórios.
+
+Para completar seu cadastro e receber contato de nossa equipe, acesse o link abaixo:
+
+{{ link_continuacao }}
+
+Importante:
+- Este link é pessoal e intransferível
+- Válido por 10 dias
+
+
+Este é um email automático do PhotoApp.
+Se você não solicitou este cadastro, pode ignorar este email.
+
+Atenciosamente,
+Equipe Photum Formaturas
