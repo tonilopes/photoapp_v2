@@ -17,11 +17,11 @@
             </div>
             <small class="text-muted" id="buscaEventosFormandosContador"></small>
         </div>
-        <div class="row g-3" id="listaEventosFormandos">
+        <div class="row g-3 align-items-start" id="listaEventosFormandos">
             {% for evento in eventos_com_formandos %}
             <div class="col-md-6 col-lg-4 card-evento-formando"
                  data-busca="{{ evento.fot|lower }} {{ evento.instituicao|lower }} {{ evento.data|date:'d/m/Y' }} {% for p in evento.parceiros.all %}{{ p.username|lower }} {{ p.first_name|lower }} {% endfor %}">
-                <div class="card h-100 shadow-sm border-primary">
+                <div class="card shadow-sm border-primary">
                     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-start"
                          style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#cardBodyFormando{{ evento.id }}"
                          aria-expanded="false" aria-controls="cardBodyFormando{{ evento.id }}">
@@ -38,7 +38,7 @@
                         </div>
                         <i class="bi bi-chevron-down"></i>
                     </div>
-                    <div class="collapse" id="cardBodyFormando{{ evento.id }}">
+                    <div class="collapse" id="cardBodyFormando{{ evento.id }}" data-bs-parent="#listaEventosFormandos">
                     <div class="card-body">
                         <div class="mb-2">
                             <small class="text-muted">Evento ID:</small><br>
