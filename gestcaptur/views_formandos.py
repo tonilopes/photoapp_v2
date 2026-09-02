@@ -520,7 +520,7 @@ def exportar_formandos(request, evento_id=None, evento_uuid=None):
     """
     evento = _obter_evento(evento_id=evento_id, evento_uuid=evento_uuid)
     
-    alunos = evento.alunos.all()
+    alunos = evento.alunos.all().order_by('nome')
     
     # Criar DataFrame com TODOS os campos
     dados = []
@@ -589,7 +589,7 @@ def baixar_tudo_formandos(request, evento_id=None, evento_uuid=None):
     
     evento = _obter_evento(evento_id=evento_id, evento_uuid=evento_uuid)
     
-    alunos = evento.alunos.all()
+    alunos = evento.alunos.all().order_by('nome')
     
     # 1. Criar DataFrame com dados
     dados = []
@@ -638,7 +638,7 @@ def baixar_tudo_formandos(request, evento_id=None, evento_uuid=None):
         excel_buffer = io.BytesIO()
         df.to_excel(excel_buffer, index=False, engine='openpyxl')
         excel_buffer.seek(0)
-        zip_file.writestr(f"{nome_pasta_normalizado}/dados.xlsx", excel_buffer.getvalue())
+        zip_file.writestr(f"{nome_pasta_normalizado}/_DADOS.xlsx", excel_buffer.getvalue())
         
         # Adicionar fotos
         for aluno in alunos:
@@ -647,10 +647,12 @@ def baixar_tudo_formandos(request, evento_id=None, evento_uuid=None):
                 foto_path = os.path.join(settings.MEDIA_ROOT, str(aluno.foto))
                 
                 if os.path.exists(foto_path):
-                    # Usar nome do arquivo sem o caminho completo
+                    # Nome do arquivo: nome do aluno em MAIÚSCULAS + extensão original da foto
+                    # (evita duplicar quando o arquivo já é salvo como NOME_DO_ALUNO.JPG)
                     nome_arquivo_foto = os.path.basename(str(aluno.foto))
-                    # Adicionar com prefixo do nome do aluno para evitar conflitos
-                    nome_no_zip = f"{nome_pasta_normalizado}/{aluno.nome}_{nome_arquivo_foto}"
+                    extensao = os.path.splitext(nome_arquivo_foto)[1] or '.JPG'
+                    nome_limpo_z = f"{aluno.nome.strip().upper()}{extensao}"
+                    nome_no_zip = f"{nome_pasta_normalizado}/{nome_limpo_z}"
                     
                     with open(foto_path, 'rb') as f:
                         zip_file.writestr(nome_no_zip, f.read())
@@ -719,16 +721,23 @@ def formandos_link_compartilhamento(request, evento_id=None, evento_uuid=None):
 
 
 @login_required
-@role_required('gestor')
 def formando_ver_cadastro(request, evento_id=None, evento_uuid=None, aluno_id=None):
     """
     Visualiza o cadastro completo de um formando
     """
     evento = _obter_evento(evento_id=evento_id, evento_uuid=evento_uuid)
     aluno = get_object_or_404(Aluno, id=aluno_id, evento=evento)
-    
-    # Verificar permissão
-    if not request.user.is_gestor() and evento.coordenador != request.user:
+
+    # Verificar permissão (mesma regra do painel formandos_status):
+    # Gestor, coordenador do evento, ou quem tem permissão de download/finalização
+    eh_gestor = request.user.is_gestor()
+    eh_coordenador = evento.coordenador == request.user
+    tem_permissao_evento = any(request.user.has_perm(permissao) for permissao in [
+        'gestcaptur.download_fotos_evento',
+        'gestcaptur.download_cadastros_evento',
+        'gestcaptur.finalizar_captura_evento',
+    ])
+    if not (eh_gestor or eh_coordenador or tem_permissao_evento):
         messages.error(request, "Você não tem permissão para acessar este cadastro.")
         return redirect('dashboard')
     
