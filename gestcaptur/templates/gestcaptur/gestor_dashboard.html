@@ -2,15 +2,15 @@
 
 {% extends "gestcaptur/base_gestor.html" %}
 
-{% block title %}Dashboard Gestor{% endblock %}
+{% block title %}Dashboard{% endblock %}
 
 {% block content %}
 <div class="container py-4">
-  <h1 class="mb-4">Dashboard do Gestor</h1>
+  <h1 class="mb-4">Dashboard</h1>
 
   {% if user.is_authenticated %}
     <div class="alert alert-info" role="alert">
-      Olá, {{ user.first_name }}! Você está logado como {{ user.get_role_display }}.
+      Olá, {{ user.first_name }}.
     </div>
   {% endif %}
 
