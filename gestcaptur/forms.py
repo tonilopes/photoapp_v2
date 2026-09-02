@@ -146,16 +146,14 @@ class CriarUsuarioForm(forms.ModelForm):
 
     class Meta:
         model = Usuario
-        fields = ['username', 'first_name', 'last_name', 'email', 'role', 'grupos', 'password', 'confirm_password'] 
+        fields = ['username', 'first_name', 'last_name', 'email', 'grupos', 'password', 'confirm_password']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'role': forms.Select(attrs={'class': 'form-select'}),
         }
         labels = {
             'username': 'Nome de usuário',
             'first_name': 'Nome',
-            'role': 'Função',
         }
 
     def clean(self):
@@ -174,37 +172,33 @@ class CriarUsuarioForm(forms.ModelForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
+        # ✅ Role derivada dos Grupos de Acesso (o campo Role não existe mais no form)
+        user.role = self._role_from_groups(self.cleaned_data.get('grupos', []))
         # ✅ CRÍTICO: Usar set_password para hash correto
         user.set_password(self.cleaned_data["password"])
         if commit:
             user.save()
-
-            # ✅ Salvar grupos selecionados
+            # ✅ Salvar grupos selecionados (fonte de verdade do acesso)
             grupos_selecionados = self.cleaned_data.get('grupos')
-            if grupos_selecionados:
-                user.groups.set(grupos_selecionados)
-            
-            # ✅ Auto-adicionar ao grupo baseado na role principal
-            self._auto_add_to_group_based_on_role(user)
-
+            user.groups.set(grupos_selecionados)
         return user
 
-    def _auto_add_to_group_based_on_role(self, user):
-        """Adiciona automaticamente o usuário ao grupo correspondente à sua role principal"""
-        role_to_group = {
-            'gestor': 'Gestor',
-            'coordenador': 'Coordenador',
-            'fotografo': 'Fotógrafo',
-            'pesquisa': 'Pesquisa',
+    def _role_from_groups(self, grupos):
+        """Define a role com base nos grupos selecionados.
+        Um único grupo mapeável -> role correspondente (gestor, coordenador...).
+        Múltiplos grupos ou grupo personalizado -> 'personalizado' (acesso via permissões do grupo).
+        """
+        group_roles = {
+            'Gestor': 'gestor',
+            'Coordenador': 'coordenador',
+            'Fotógrafo': 'fotografo',
+            'Pesquisa': 'pesquisa',
+            'Parceiro': 'parceiro',
         }
-        
-        group_name = role_to_group.get(user.role)
-        if group_name:
-            try:
-                group = Group.objects.get(name=group_name)
-                user.groups.add(group)
-            except Group.DoesNotExist:
-                print(f"⚠️  Grupo '{group_name}' não encontrado. Crie os grupos no admin.")
+        nomes = [g.name for g in grupos]
+        if len(nomes) == 1 and nomes[0] in group_roles:
+            return group_roles[nomes[0]]
+        return 'personalizado'
 
 
 class EditarUsuarioForm(forms.ModelForm):
@@ -229,11 +223,12 @@ class EditarUsuarioForm(forms.ModelForm):
 
     class Meta:
         model = Usuario
-        fields = ['username', 'first_name', 'role', 'is_active']
+        fields = ['username', 'first_name', 'last_name', 'email', 'is_active', 'grupos']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'role': forms.Select(attrs={'class': 'form-select'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
@@ -261,34 +256,16 @@ class EditarUsuarioForm(forms.ModelForm):
         if password:
             user.set_password(password)
         
+        # ✅ A role NÃO é alterada na edição — o acesso é controlado pelos Grupos de Acesso
+        # (a role foi derivada dos grupos na criação; aqui só atualizamos os grupos)
+        
         if commit:
             user.save()
-            # ✅ ADICIONADO: Atualizar grupos
+            # ✅ Atualizar grupos (fonte de verdade do acesso)
             grupos_selecionados = self.cleaned_data.get('grupos', [])
             user.groups.set(grupos_selecionados)
-            
-            # ✅ ADICIONADO: Auto-adicionar ao grupo baseado na role principal (se não tiver grupos)
-            if not grupos_selecionados:
-                self._auto_add_to_group_based_on_role(user)
         
         return user
-
-    def _auto_add_to_group_based_on_role(self, user):
-        """Adiciona automaticamente o usuário ao grupo correspondente à sua role principal"""
-        role_to_group = {
-            'gestor': 'Gestor',
-            'coordenador': 'Coordenador',
-            'fotografo': 'Fotógrafo',
-            'pesquisa': 'Pesquisa',
-        }
-        
-        group_name = role_to_group.get(user.role)
-        if group_name:
-            try:
-                group = Group.objects.get(name=group_name)
-                user.groups.add(group)
-            except Group.DoesNotExist:
-                print(f"⚠️  Grupo '{group_name}' não encontrado.")
 
 
 class UploadFotoForm(forms.ModelForm):

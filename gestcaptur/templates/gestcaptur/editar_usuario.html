@@ -47,13 +47,6 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="{{ form.role.id_for_label }}" class="form-label">{{ form.role.label }}</label>
-                                {{ form.role }}
-                                {% if form.role.errors %}
-                                    <div class="text-danger small">{{ form.role.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6 mb-3">
                                 <div class="form-check">
                                     {{ form.is_active }}
                                     <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
@@ -61,9 +54,16 @@
                                     </label>
                                 </div>
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.confirm_password.id_for_label }}" class="form-label">{{ form.confirm_password.label }}</label>
+                                {{ form.confirm_password }}
+                                {% if form.confirm_password.errors %}
+                                    <div class="text-danger small">{{ form.confirm_password.errors.0 }}</div>
+                                {% endif %}
+                            </div>
                         </div>
 
-                        <!-- ✅ NOVO: Campo de grupos -->
+                        <!-- ✅ Campo de grupos (única fonte de acesso) -->
                         <div class="mb-3">
                             <label class="form-label">{{ form.grupos.label }}</label>
                             <div class="border rounded p-3">

@@ -62,18 +62,7 @@
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="{{ form.role.id_for_label }}" class="form-label">{{ form.role.label }}</label>
-                            {{ form.role }}
-                            <div class="form-text">
-                                A função principal determina o dashboard padrão e as permissões básicas.
-                            </div>
-                            {% if form.role.errors %}
-                                <div class="text-danger small">{{ form.role.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <!-- ✅ NOVO: Campo de grupos -->
+                        <!-- ✅ Campo de grupos (única fonte de acesso) -->
                         <div class="mb-3">
                             <label class="form-label">{{ form.grupos.label }}</label>
                             <div class="border rounded p-3">
