@@ -138,3 +138,6 @@ db.sqlite3.backup*
 *.save
 gestcaptur/media/
 /views.txt
+
+# Scripts de comparacao de manifest
+/_*.sh
