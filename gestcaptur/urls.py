@@ -56,7 +56,10 @@ urlpatterns = [
     path('importar/eventos/', views.importar_eventos, name='importar_eventos'),
     path('exportar-eventos/', views.exportar_eventos, name='exportar_eventos'),
     
-    path('evento/criar/', views.criar_evento, name='criar_evento'),
+    # Criação de evento: novo fluxo simplificado (modal) em /evento/criar/;
+    # formulário completo original preservado como backup em /evento/criar/completo/
+    path('evento/criar/', views.criar_evento_modal, name='criar_evento'),
+    path('evento/criar/completo/', views.criar_evento, name='criar_evento_completo'),
     path('eventos/', views.listar_eventos, name='listar_eventos'),
     path('evento/<int:evento_id>/editar/', views.editar_evento, name='editar_evento'),
     path('evento/<int:evento_id>/excluir/', views.deletar_evento, name='deletar_evento'),

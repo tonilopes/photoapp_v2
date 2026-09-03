@@ -17,7 +17,7 @@ from django.conf import settings
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from gestcaptur.models import Evento, Aluno, Usuario, SessaoFotografica
-from gestcaptur.forms import LoginForm, UploadFotoForm, ImportXLSXForm, CriarUsuarioForm, EditarUsuarioForm, EventoForm, AlunoCadastroForm, RoleForm
+from gestcaptur.forms import LoginForm, UploadFotoForm, ImportXLSXForm, CriarUsuarioForm, EditarUsuarioForm, EventoForm, CriarEventoModalForm, AlunoCadastroForm, RoleForm
 from gestcaptur.decorators import role_required, group_required, dashboard_gestor_required, coordenador_fotografo_required, evento_permission_required
 from datetime import datetime, timedelta
 import logging
@@ -131,6 +131,41 @@ def criar_evento(request):
         form = EventoForm()
     
     return render(request, 'gestcaptur/criar_evento.html', {'form': form})
+
+
+def criar_evento_modal(request):
+    """Criação simplificada de evento (novo fluxo, campos essenciais).
+
+    Campos: Código FOT*, Data do Evento*, Tipo de Evento*, Instituição*,
+    Curso, Empresa* + seção 'Evento com Selfie e Cadastro de Formandos'
+    (sem 'Importar nomes?').
+
+    O formulário completo antigo permanece disponível como backup em
+    /evento/criar/completo/ (name 'criar_evento_completo').
+    """
+    if request.method == 'POST':
+        form = CriarEventoModalForm(request.POST)
+        if form.is_valid():
+            evento = form.save(commit=False)
+            # Defaults dos campos não presentes no formulário simplificado
+            evento.status = 'pendente'
+            evento.save()
+
+            messages.success(request, f"Evento '{evento.fot}' criado com sucesso!")
+            if getattr(evento, 'para_selfie', False):
+                try:
+                    link = request.build_absolute_uri(
+                        reverse('captura_selfie_publico', args=[evento.id])
+                    )
+                    messages.info(request, f"Link público para captura de selfie: {link}")
+                except Exception as e:
+                    logger.warning(f"Erro ao gerar link de selfie: {e}")
+            return redirect('dashboard')
+        else:
+            messages.error(request, 'Verifique os campos destacados e tente novamente.')
+    else:
+        form = CriarEventoModalForm()
+    return render(request, 'gestcaptur/criar_evento_modal.html', {'form': form})
 
 
 def listar_eventos(request):

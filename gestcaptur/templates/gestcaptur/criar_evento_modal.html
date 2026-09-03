@@ -1,0 +1,141 @@
+{% extends 'gestcaptur/base_gestor.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Criar Evento{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow border-0">
+                <div class="card-header bg-success text-white py-3">
+                    <h4 class="mb-0">
+                        <i class="bi bi-plus-circle"></i> Criar Novo Evento
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {{ form.non_field_errors }}
+                            </div>
+                        {% endif %}
+
+                        <!-- Dados do Evento -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.fot.id_for_label }}" class="form-label required-field">
+                                    {{ form.fot.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.fot|add_class:"form-control" }}
+                                {% if form.fot.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.fot.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.data.id_for_label }}" class="form-label required-field">
+                                    {{ form.data.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.data|add_class:"form-control" }}
+                                {% if form.data.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.data.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.tipo_evento.id_for_label }}" class="form-label required-field">
+                                {{ form.tipo_evento.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.tipo_evento|add_class:"form-control" }}
+                            {% if form.tipo_evento.errors %}
+                                <div class="invalid-feedback d-block">{{ form.tipo_evento.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.instituicao.id_for_label }}" class="form-label required-field">
+                                {{ form.instituicao.label }} <span class="text-danger">*</span>
+                            </label>
+                            {{ form.instituicao|add_class:"form-control" }}
+                            {% if form.instituicao.errors %}
+                                <div class="invalid-feedback d-block">{{ form.instituicao.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.curso.id_for_label }}" class="form-label">
+                                    {{ form.curso.label }}
+                                </label>
+                                {{ form.curso|add_class:"form-control" }}
+                                {% if form.curso.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.curso.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.empresa.id_for_label }}" class="form-label required-field">
+                                    {{ form.empresa.label }} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.empresa|add_class:"form-control" }}
+                                {% if form.empresa.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.empresa.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Selfie / Formandos -->
+                        <div class="form-section" style="border-left-color: #28a745; background: #f0f9f6; border-radius: 8px; padding: 1rem;">
+                            <h6 class="mb-2" style="color: #28a745;">
+                                <i class="bi bi-camera-fill"></i> Evento com Selfie e Cadastro de Formandos
+                            </h6>
+                            <p class="text-muted small mb-3">
+                                Formandos receberão um link ou QRCode para fazer selfie e preencher cadastro online.
+                            </p>
+
+                            <div class="form-check mb-3">
+                                {{ form.para_selfie }}
+                                <label for="{{ form.para_selfie.id_for_label }}" class="form-check-label fw-bold">
+                                    Ativar captura de selfie pública para este evento
+                                </label>
+                            </div>
+
+                            <div class="mb-2">
+                                <label for="{{ form.codigo_turma.id_for_label }}" class="form-label">
+                                    {{ form.codigo_turma.label }}
+                                </label>
+                                {{ form.codigo_turma|add_class:"form-control" }}
+                                <small class="text-muted">Ex: 2026-A, EM-001, 3º-Ano-B</small>
+                                {% if form.codigo_turma.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.codigo_turma.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            {# Campo 'permite_importacao_nomes' removido conforme solicitado #}
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> Criar Evento
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="text-center mt-3">
+                        <a href="{% url 'criar_evento_completo' %}" class="small text-muted text-decoration-none">
+                            <i class="bi bi-gear"></i> Usar formulário completo (backup)
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

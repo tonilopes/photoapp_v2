@@ -458,6 +458,86 @@ class EventoForm(forms.ModelForm):
         
         return cleaned_data
 
+class CriarEventoModalForm(forms.ModelForm):
+    """
+    Formulário simplificado (modal) para criação de eventos.
+
+    Campos:
+      * Código FOT, Data do Evento, Tipo de Evento, Instituição, Empresa (obrigatórios)
+        Curso (opcional)
+      * Sem Local do Evento, Fotógrafos Atribuídos, Coordenador Responsável
+      * 'Evento com Selfie e Cadastro de Formandos' sem o campo 'Importar nomes?'
+    """
+
+    class Meta:
+        model = Evento
+        fields = [
+            'fot', 'data', 'tipo_evento', 'instituicao', 'curso', 'empresa',
+            'para_selfie', 'codigo_turma',
+        ]
+        widgets = {
+            'data': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control'
+            }),
+            'fot': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ex: 26000'
+            }),
+            'instituicao': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da Instituição'
+            }),
+            'curso': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome do Curso'
+            }),
+            'empresa': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da Empresa'
+            }),
+            'tipo_evento': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ex: Formatura, Colação de Grau'
+            }),
+            'para_selfie': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'codigo_turma': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ex: 2026-A, EM-001',
+                'maxlength': 100
+            }),
+        }
+        labels = {
+            'fot': 'Código FOT',
+            'data': 'Data do Evento',
+            'tipo_evento': 'Tipo de Evento',
+            'instituicao': 'Instituição',
+            'curso': 'Curso',
+            'empresa': 'Empresa',
+            'para_selfie': 'Evento com Selfie e Cadastro de Formandos',
+            'codigo_turma': 'Código da Turma',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Campos obrigatórios do modal (marcados com *)
+        required_fields = ['fot', 'data', 'tipo_evento', 'instituicao', 'empresa']
+        for field_name in required_fields:
+            self.fields[field_name].required = True
+            attrs = self.fields[field_name].widget.attrs
+            existing = attrs.get('class', '')
+            attrs['class'] = (existing + ' required').strip()
+            attrs['required'] = 'required'
+
+    def clean_codigo_turma(self):
+        codigo_turma = (self.cleaned_data.get('codigo_turma') or '').strip()
+        if any(caractere in codigo_turma for caractere in ('/', '\\')):
+            raise forms.ValidationError('O Código da Turma não pode conter barras ou subpastas.')
+        return codigo_turma or None
+
+
 class AlunoCadastroForm(forms.ModelForm):
     class Meta:
         model = Aluno
