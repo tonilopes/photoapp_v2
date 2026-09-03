@@ -287,8 +287,12 @@ def gerar_link_compartilhamento_parceiro(request, evento_id=None, evento_uuid=No
         return redirect('gerenciar_parceiros_evento_uuid', evento_uuid=evento.uuid)
     
     # Preparar dados para compartilhamento
-    link_painel = f"https://photoapp.photum.com.br/evento/{evento.uuid}/formandos-status/"
-    link_login = f"https://photoapp.photum.com.br/login/?next=/evento/{evento.uuid}/formandos-status/"
+    # ✅ Links gerados dinamicamente a partir do host usado no acesso
+    # (antes eram hardcoded para https://photoapp.photum.com.br — errado no v2/fotoid)
+    from django.urls import reverse
+    path_painel = reverse('formandos_status_uuid', kwargs={'evento_uuid': evento.uuid})
+    link_painel = request.build_absolute_uri(path_painel)
+    link_login = request.build_absolute_uri('/login/') + '?next=' + path_painel
     
     context = {
         'evento': evento,
