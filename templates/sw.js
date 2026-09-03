@@ -1,5 +1,5 @@
 // Service Worker do painel interno (Gestor/Coordenador/Fotógrafo). Não é registrado nas páginas públicas de clientes.
-const STATIC_CACHE = 'gestcaptur-static-v1';
+const STATIC_CACHE = 'gestcaptur-static-v2';
 
 const PRECACHE_URLS = [
   '/static/gestcaptur/manifest.json',
@@ -43,8 +43,18 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       caches.match(request).then(cached => {
         const networkFetch = fetch(request).then(response => {
-          if (response && response.ok) {
-            caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()));
+          if (response && response.ok && response.type === 'basic') {
+            try {
+              // Clona SINCRONAMENTE antes de qualquer uso do body,
+              // evitando "Response body is already used" ao gravar no cache.
+              const copy = response.clone();
+              event.waitUntil(
+                caches.open(STATIC_CACHE).then(cache => cache.put(request, copy))
+              );
+            } catch (err) {
+              // Falha ao cachear nunca deve quebrar a resposta ao usuário
+              console.warn('SW: falha ao cachear', request.url, err);
+            }
           }
           return response;
         }).catch(() => cached);
