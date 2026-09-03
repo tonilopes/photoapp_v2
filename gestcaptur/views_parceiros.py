@@ -196,25 +196,21 @@ def ativar_parceiro(request, parceiro_id):
 # ============================================================================
 
 @login_required
-@group_required('Gestor')
 def gerenciar_parceiros_evento(request, evento_id=None, evento_uuid=None):
     """
     Gerencia quais parceiros têm acesso a um evento específico.
     Permite adicionar e remover parceiros do evento.
     
-    Acessível por:
-    - Gestor (acesso completo)
-    - Coordenador do evento (acesso completo)
+    ✅ Mesma regra do botão 'Parceiros' no painel: gestor, coordenador do
+    evento, ou perm. 'ver_botao_parceiros_formandos'.
+    (Antes exigia grupo 'Gestor' -> loop/403 para outros usuários.)
     """
-    from .views_formandos import _obter_evento
+    from .views_formandos import _obter_evento, _pode_usar_botao_formandos
     
     evento = _obter_evento(evento_id=evento_id, evento_uuid=evento_uuid)
     
-    # Verificar permissão (apenas gestor ou coordenador do evento)
-    eh_gestor = request.user.is_gestor()
-    eh_coordenador = evento.coordenador == request.user
-    
-    if not (eh_gestor or eh_coordenador):
+    # Verificar permissão (idêntica à regra que exibe o botão no painel)
+    if not _pode_usar_botao_formandos(request.user, evento, 'ver_botao_parceiros_formandos'):
         messages.error(request, "Você não tem permissão para gerenciar parceiros deste evento.")
         return redirect('dashboard')
     
@@ -259,7 +255,6 @@ def gerenciar_parceiros_evento(request, evento_id=None, evento_uuid=None):
 
 
 @login_required
-@group_required('Gestor')
 def gerar_link_compartilhamento_parceiro(request, evento_id=None, evento_uuid=None):
     """
     Gera instruções de acesso para compartilhar com um parceiro.
@@ -268,19 +263,15 @@ def gerar_link_compartilhamento_parceiro(request, evento_id=None, evento_uuid=No
     - Username do parceiro
     - Instruções para o parceiro fazer login
     
-    Acessível por:
-    - Gestor (acesso completo)
-    - Coordenador do evento
+    ✅ Mesma regra do botão 'Parceiros' no painel: gestor, coordenador do
+    evento, ou perm. 'ver_botao_parceiros_formandos'.
     """
-    from .views_formandos import _obter_evento
+    from .views_formandos import _obter_evento, _pode_usar_botao_formandos
     
     evento = _obter_evento(evento_id=evento_id, evento_uuid=evento_uuid)
     
-    # Verificar permissão
-    eh_gestor = request.user.is_gestor()
-    eh_coordenador = evento.coordenador == request.user
-    
-    if not (eh_gestor or eh_coordenador):
+    # Verificar permissão (idêntica à regra que exibe o botão no painel)
+    if not _pode_usar_botao_formandos(request.user, evento, 'ver_botao_parceiros_formandos'):
         messages.error(request, "Você não tem permissão.")
         return redirect('dashboard')
     

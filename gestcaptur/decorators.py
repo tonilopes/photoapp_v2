@@ -4,29 +4,42 @@ from django.contrib.auth.decorators import user_passes_test, login_required
 from django.shortcuts import redirect
 from django.contrib import messages
 from django.http import HttpResponseForbidden
+from django.core.exceptions import PermissionDenied
 from gestcaptur.models import Evento
 from functools import wraps
 import logging
 
 logger = logging.getLogger(__name__)
 
+# NOTA ANTI-LOOP:
+# Quando um usuário AUTENTICADO falha em role_required/group_required,
+# NÃO redirecionamos para o login. O login_view devolve o usuário autenticado
+# de volta para a URL de origem via ?next=, o que criaria um loop infinito
+# de redirecionamento ("Redirecionamento em excesso" no navegador).
+# Nesses casos levantamos PermissionDenied (página 403), que nunca redireciona.
+
 def role_required(allowed_roles):
     """
     Decorator para verificar se o usuário tem a role necessária.
     Aceita uma string (single role) ou uma lista de strings (múltiplas roles).
+
+    ✅ Anti-loop: usuário autenticado sem a role recebe 403.
     """
     if not isinstance(allowed_roles, (list, tuple)):
         allowed_roles = [allowed_roles]
 
     def check_role(user):
         if not user.is_authenticated:
-            return False
+            return False  # anônimo -> tela de login (com ?next=)
         
         if user.role in allowed_roles:
             return True
             
         logger.warning(f"Acesso negado para {user.username}. Role: {user.role}, Permitidas: {allowed_roles}")
-        return False
+        raise PermissionDenied(
+            f"Acesso negado: esta área exige role '{allowed_roles}' "
+            f"(usuário '{user.username}' tem role '{user.role}')."
+        )
         
     return user_passes_test(check_role, login_url='login')
 
@@ -70,11 +83,14 @@ def group_required(group_names, login_url='login', raise_exception=False):
                     return True
         
         if raise_exception:
-            from django.core.exceptions import PermissionDenied
-            raise PermissionDenied(f"Acesso negado. Grupos ou roles necessários: {group_names}")
-            
+            logger.warning(f"Acesso negado (raise) para {user.username}. Grupos: {user_groups}, Role: {user.role}")
+        
+        # ✅ Anti-loop: autenticado sem acesso -> 403 (nunca redirecionar ao login)
         logger.warning(f"Acesso negado para {user.username}. Grupos: {user_groups}, Role: {user.role}")
-        return False
+        raise PermissionDenied(
+            f"Acesso negado para {user.username}. Grupos: {user_groups}, Role: {user.role}. "
+            f"Grupos ou roles necessários: {group_names}"
+        )
         
     return user_passes_test(check_group, login_url=login_url)
 
@@ -97,7 +113,13 @@ def dashboard_gestor_required(view_func):
             return True
         if user.has_perm('gestcaptur.view_evento'):
             return True
-        return any(user.has_perm(f'gestcaptur.{p}') for p in TAB_PERMS)
+        if any(user.has_perm(f'gestcaptur.{p}') for p in TAB_PERMS):
+            return True
+        # ✅ Anti-loop: autenticado sem acesso ao dashboard -> 403
+        logger.warning(f"Dashboard negado para {user.username} (sem view_evento nem guias).")
+        raise PermissionDenied(
+            f"Acesso negado: usuário '{user.username}' não tem permissão para acessar o dashboard."
+        )
 
     return login_required(user_passes_test(check, login_url='login')(view_func))
 
@@ -112,14 +134,22 @@ def coordenador_fotografo_required(function=None, login_url='login'):
             
         is_coordenador = user.groups.filter(name='Coordenador').exists()
         if not is_coordenador:
-            return False
+            # ✅ Anti-loop: autenticado sem acesso -> 403
+            raise PermissionDenied(
+                f"Acesso negado: usuário '{user.username}' não pertence ao grupo Coordenador."
+            )
             
         atua_como_fotografo = Evento.objects.filter(
             coordenador=user,
             coordenador_tambem_fotografo=True
         ).exists()
         
-        return atua_como_fotografo
+        if atua_como_fotografo:
+            return True
+        # ✅ Anti-loop: autenticado sem acesso -> 403
+        raise PermissionDenied(
+            f"Acesso negado: coordenador '{user.username}' não atua como fotógrafo em nenhum evento."
+        )
     
     actual_decorator = user_passes_test(check_coordenador_fotografo, login_url=login_url)
     

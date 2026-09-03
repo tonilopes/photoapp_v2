@@ -667,16 +667,31 @@ def baixar_tudo_formandos(request, evento_id=None, evento_uuid=None):
     return response
 
 
+def _pode_usar_botao_formandos(user, evento, permissao_botao):
+    """Mesma regra usada para EXIBIR os botões no painel formandos_status
+    (can_compartilhar / can_gerenciar_parceiros): gestor, coordenador do
+    evento, ou permissão específica do botão. Assim o botão nunca aparece
+    para quem a view vai bloquear (e vice-versa)."""
+    return (
+        user.is_gestor()
+        or evento.coordenador_id == user.id
+        or user.has_perm(f'gestcaptur.{permissao_botao}')
+    )
+
+
 @login_required
-@role_required('gestor')
 def formandos_link_compartilhamento(request, evento_id=None, evento_uuid=None):
     """
     Mostra o link de acesso público e QRCode para compartilhar com formandos
+
+    ✅ Mesma regra do botão 'Compartilhar Link/QRCode' no painel:
+    gestor, coordenador do evento, ou perm. 'ver_botao_compartilhar_formandos'.
+    (Antes exigia role 'gestor' -> loop de redirecionamento para outros usuários.)
     """
     evento = _obter_evento(evento_id=evento_id, evento_uuid=evento_uuid)
     
-    # Verificar permissão
-    if not request.user.is_gestor() and evento.coordenador != request.user:
+    # Verificar permissão (idêntica à regra que exibe o botão no painel)
+    if not _pode_usar_botao_formandos(request.user, evento, 'ver_botao_compartilhar_formandos'):
         messages.error(request, "Você não tem permissão para acessar esta página.")
         return redirect('dashboard')
     

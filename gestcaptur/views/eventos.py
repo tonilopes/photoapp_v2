@@ -73,6 +73,10 @@ def alterar_status_evento(request, evento_id):
 
 
 def criar_evento(request):
+    """Formulário completo (backup). Protegido pela mesma regra do fluxo novo."""
+    bloqueio = _proteger_criar_evento(request)
+    if bloqueio is not None:
+        return bloqueio
     if request.method == 'POST':
         print("🔍 DEBUG VIEW - Dados POST recebidos:")
         for key, value in request.POST.items():
@@ -133,6 +137,35 @@ def criar_evento(request):
     return render(request, 'gestcaptur/criar_evento.html', {'form': form})
 
 
+def _pode_criar_evento(user):
+    """Proteção comum às views de criação de evento (novo fluxo e backup).
+    Gestor, coordenador, fotógrafo, pesquisa autenticado, ou quem tem
+    add_evento. (Antes estas views estavam SEM proteção -> qualquer pessoa
+    podia criar evento; e role_required('gestor') causava loop p/ os demais.)"""
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser or user.is_gestor():
+        return True
+    if user.has_perm('gestcaptur.add_evento'):
+        return True
+    # Roles operacionais podem criar evento (e ficam vinculados a ele)
+    return user.role in ('coordenador', 'fotografo', 'pesquisa') or user.is_coordenador() or user.is_fotografo()
+
+
+def _proteger_criar_evento(request):
+    """Retorna None se OK. Se anônimo -> redirect ao login; se autenticado
+    sem permissão -> 403 (sem loop)."""
+    if not request.user.is_authenticated:
+        from django.contrib.auth.views import redirect_to_login
+        return redirect_to_login(request.get_full_path())
+    if not _pode_criar_evento(request.user):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied(
+            f"Acesso negado: usuário '{request.user.username}' não pode criar eventos."
+        )
+    return None
+
+
 def criar_evento_modal(request):
     """Criação simplificada de evento (novo fluxo, campos essenciais).
 
@@ -143,6 +176,9 @@ def criar_evento_modal(request):
     O formulário completo antigo permanece disponível como backup em
     /evento/criar/completo/ (name 'criar_evento_completo').
     """
+    bloqueio = _proteger_criar_evento(request)
+    if bloqueio is not None:
+        return bloqueio
     if request.method == 'POST':
         form = CriarEventoModalForm(request.POST)
         if form.is_valid():
@@ -150,6 +186,9 @@ def criar_evento_modal(request):
             # Defaults dos campos não presentes no formulário simplificado
             evento.status = 'pendente'
             evento.save()
+
+            # Vincula o criador ao evento (para permissões de coordenador/fotógrafo)
+            _vincular_criador_ao_evento(request.user, evento)
 
             messages.success(request, f"Evento '{evento.fot}' criado com sucesso!")
             if getattr(evento, 'para_selfie', False):
@@ -166,6 +205,23 @@ def criar_evento_modal(request):
     else:
         form = CriarEventoModalForm()
     return render(request, 'gestcaptur/criar_evento_modal.html', {'form': form})
+
+
+def _vincular_criador_ao_evento(user, evento):
+    """Se o criador não for gestor, vincula-o ao evento conforme a role:
+    coordenador -> coordenador do evento; fotógrafo -> fotógrafo atribuído."""
+    try:
+        if user.is_gestor() or user.is_superuser:
+            return
+        if user.is_coordenador():
+            if not evento.coordenador_id:
+                evento.coordenador = user
+                evento.save(update_fields=['coordenador'])
+        elif user.is_fotografo():
+            if not evento.fotografos.filter(pk=user.pk).exists():
+                evento.fotografos.add(user)
+    except Exception as e:
+        logger.warning(f"Não foi possível vincular {user.username} ao evento {evento.fot}: {e}")
 
 
 def listar_eventos(request):
