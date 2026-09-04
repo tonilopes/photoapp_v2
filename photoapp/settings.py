@@ -33,6 +33,10 @@ CSRF_TRUSTED_ORIGINS = [
     'https://externo.photum.com.br:2543',
     'https://cliente.photum.com.br',
     'https://cliente.photum.com.br:2543',
+
+    # Painel v2 (fotoid)
+    'https://fotoid.photum.com.br',
+    'http://fotoid.photum.com.br',
 ]
 
 # ============================================
