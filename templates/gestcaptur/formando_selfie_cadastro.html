@@ -90,12 +90,20 @@
                     <video id="video" autoplay playsinline></video>
                     <div class="face-guide" aria-hidden="true"></div>
                     <div class="countdown-overlay" id="countdownOverlay" aria-hidden="true"><span id="countdownNumber">3</span></div>
+                    <div class="flash-overlay" id="flashOverlay" aria-hidden="true"></div>
                 </div>
                 <div id="cameraStatus" class="alert alert-info mt-3" role="status" aria-live="polite">
                     Permita o acesso à câmera. Vamos orientar seu enquadramento.
                 </div>
                 
-                <div class="mt-3 mb-3">
+                <div class="form-check form-switch mt-2 mb-1">
+                    <input class="form-check-input" type="checkbox" id="autoCapturaCheck" checked>
+                    <label class="form-check-label" for="autoCapturaCheck">
+                        Captura automática quando o enquadramento estiver ideal
+                    </label>
+                </div>
+
+                <div class="mt-2 mb-3">
                     <button type="button" class="btn btn-success" id="captureBtn">
                         <i class="bi bi-camera-fill"></i> Capturar Foto
                     </button>
@@ -226,6 +234,22 @@
     100% { transform: scale(.9);  opacity: .85; }
 }
 
+/* Flash-iluminação: tela branca antes do disparo ilumina o rosto + feedback do shutter */
+.flash-overlay {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 6;
+    transition: opacity .25s ease-out;
+}
+
+.flash-overlay.solid {
+    opacity: 1;
+    transition: opacity .12s ease-in;
+}
+
 @media (max-width: 576px) {
     .modal-body { padding: 12px !important; }
     .camera-frame { width: 100%; }
@@ -245,10 +269,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const cameraStatus = document.getElementById('cameraStatus');
     const countdownOverlay = document.getElementById('countdownOverlay');
     const countdownNumber = document.getElementById('countdownNumber');
+    const flashOverlay = document.getElementById('flashOverlay');
+    const autoCapturaCheck = document.getElementById('autoCapturaCheck');
     let faceDetector = null;
     let guidanceFrame = null;
     let countdownTimer = null;
     let blobCapturado = null;
+    let streamAtual = null;            // guardado p/ ImageCapture.takePhoto()
+    let inicioQualidadeOk = null;      // acumula tempo de enquadramento ideal (auto-captura)
+    let autoCapturaDisparada = false;
+    let pontuacaoCanvas = null;
+    let pontuacaoCtx = null;
+    let quadroTempCanvas = null;
+    let melhorQuadroCanvas = null;
     let faceOk = false;
     let detectorUnavailable = false;
     let lastSpoken = '';
@@ -334,6 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateGuidance() {
         if (!faceDetector || video.readyState < 2) return;
+        if (!faceOk) inicioQualidadeOk = null;  // saiu do enquadramento: zera acumulação
         const result = faceDetector.detectForVideo(video, performance.now());
         const detections = result.detections || [];
         faceOk = false;
@@ -367,6 +401,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     faceOk = true;
                     setStatus('Rosto centralizado. Você pode capturar.', 'success', false);
+                    // Fase 3: auto-captura — enquadramento ideal por 1,5s dispara o countdown
+                    if (inicioQualidadeOk === null) inicioQualidadeOk = performance.now();
+                    if (autoCapturaCheck.checked && !autoCapturaDisparada && !countdownTimer &&
+                        preview.style.display === 'none' &&
+                        (performance.now() - inicioQualidadeOk) >= 1500) {
+                        autoCapturaDisparada = true;
+                        setStatus('Enquadramento ideal! Capturando automaticamente...', 'success', false);
+                        iniciarCountdown();
+                    }
                 }
             }
         }
@@ -383,6 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             audio: false
         }).then(stream => {
+            streamAtual = stream;   // guardado para ImageCapture.takePhoto()
             video.srcObject = stream;
             video.play();
             setStatus('Analise do rosto iniciando. Olhe para a câmera.', 'info', false);
@@ -398,7 +442,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (video.srcObject) {
             video.srcObject.getTracks().forEach(track => track.stop());
         }
+        streamAtual = null;
         if (guidanceFrame) cancelAnimationFrame(guidanceFrame);
+        if (countdownTimer) {
+            clearInterval(countdownTimer);
+            countdownTimer = null;
+            countdownOverlay.style.display = 'none';
+            flashOverlay.classList.remove('solid');
+            captureBtn.disabled = false;
+        }
+        autoCapturaDisparada = false;
     });
 
     // Capturar foto: inicia countdown 3-2-1 (reduz blur por movimento)
@@ -411,17 +464,23 @@ document.addEventListener('DOMContentLoaded', function() {
             setStatus('Ajuste seu rosto no contorno antes de capturar.', 'warning');
             return;
         }
+        iniciarCountdown();
+    });
+
+    function iniciarCountdown() {
+        if (countdownTimer) return;  // countdown já em andamento
         let restante = 3;
         captureBtn.disabled = true;
         countdownOverlay.style.display = 'flex';
         countdownNumber.textContent = restante;
-        clearInterval(countdownTimer);
         countdownTimer = setInterval(function() {
             if (!faceOk) {
                 clearInterval(countdownTimer);
                 countdownTimer = null;
                 countdownOverlay.style.display = 'none';
                 captureBtn.disabled = false;
+                autoCapturaDisparada = false;
+                inicioQualidadeOk = null;
                 setStatus('Rosto saiu do enquadramento. Encaixe novamente e toque em capturar.', 'warning');
                 return;
             }
@@ -431,32 +490,126 @@ document.addEventListener('DOMContentLoaded', function() {
                 countdownTimer = null;
                 countdownOverlay.style.display = 'none';
                 captureBtn.disabled = false;
-                capturarFoto();
-                if (navigator.vibrate) navigator.vibrate(60);
+                dispararCaptura();
             } else {
                 countdownNumber.textContent = restante;
             }
         }, 800);
-    });
+    }
+
+    function dispararCaptura() {
+        if (navigator.vibrate) navigator.vibrate(60);
+        // Flash-iluminação: tela branca por ~300ms ilumina o rosto antes do disparo
+        flashOverlay.classList.add('solid');
+        setTimeout(function() {
+            Promise.resolve(capturarFoto()).finally(function() {
+                flashOverlay.classList.remove('solid');  // fade rápido = feedback do shutter
+            });
+        }, 300);
+    }
+
+    // Escolhe a melhor fonte disponível para o disparo:
+    // 1) takePhoto() da ImageCapture API — foto full-res do hardware (Android/Chrome);
+    // 2) fallback: best-shot — 5 quadros do vídeo, guarda o mais nítido (variância laplaciana).
+    async function obterMelhorQuadro() {
+        try {
+            if (streamAtual && 'ImageCapture' in window) {
+                const track = streamAtual.getVideoTracks()[0];
+                const captor = new ImageCapture(track);
+                const blobFoto = await captor.takePhoto();
+                const bitmap = await createImageBitmap(blobFoto);
+                return bitmap;
+            }
+        } catch (e) {
+            console.warn('takePhoto indisponível; usando best-shot de vídeo.', e);
+        }
+
+        if (!quadroTempCanvas) quadroTempCanvas = document.createElement('canvas');
+        if (!melhorQuadroCanvas) melhorQuadroCanvas = document.createElement('canvas');
+        let melhorScore = -1;
+        for (let i = 0; i < 5; i++) {
+            if (video.videoWidth && video.readyState >= 2) {
+                if (quadroTempCanvas.width !== video.videoWidth || quadroTempCanvas.height !== video.videoHeight) {
+                    quadroTempCanvas.width = video.videoWidth;
+                    quadroTempCanvas.height = video.videoHeight;
+                }
+                quadroTempCanvas.getContext('2d').drawImage(video, 0, 0);
+                const score = pontuarNitidez(quadroTempCanvas);
+                if (score > melhorScore) {
+                    melhorScore = score;
+                    if (melhorQuadroCanvas.width !== quadroTempCanvas.width || melhorQuadroCanvas.height !== quadroTempCanvas.height) {
+                        melhorQuadroCanvas.width = quadroTempCanvas.width;
+                        melhorQuadroCanvas.height = quadroTempCanvas.height;
+                    }
+                    melhorQuadroCanvas.getContext('2d').drawImage(quadroTempCanvas, 0, 0);
+                }
+            }
+            await new Promise(r => setTimeout(r, 110));
+        }
+        return melhorQuadroCanvas;
+    }
+
+    // Pontua nitidez (variância laplaciana) em amostra reduzida — quanto maior, mais nítido
+    function pontuarNitidez(fonte) {
+        const S = 160;
+        if (!pontuacaoCanvas) {
+            pontuacaoCanvas = document.createElement('canvas');
+            pontuacaoCanvas.width = S;
+            pontuacaoCanvas.height = S;
+            pontuacaoCtx = pontuacaoCanvas.getContext('2d', { willReadFrequently: true });
+        }
+        pontuacaoCtx.drawImage(fonte, 0, 0, S, S);
+        const { data } = pontuacaoCtx.getImageData(0, 0, S, S);
+        const gray = new Float32Array(S * S);
+        for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+            gray[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        }
+        let soma = 0, soma2 = 0, n = 0;
+        for (let y = 1; y < S - 1; y++) {
+            for (let x = 1; x < S - 1; x++) {
+                const idx = y * S + x;
+                const lap = gray[idx - 1] + gray[idx + 1] + gray[idx - S] + gray[idx + S] - 4 * gray[idx];
+                soma += lap;
+                soma2 += lap * lap;
+                n++;
+            }
+        }
+        const media = soma / n;
+        return (soma2 / n) - media * media;
+    }
 
     // Captura em alta resolução (proporção 3:4, sem upscale, espelhada como no preview)
-    function capturarFoto() {
+    async function capturarFoto() {
+        let fonte = video;  // fallback: frame atual do vídeo
+        try {
+            const quadro = await obterMelhorQuadro();
+            if (quadro && quadro.width && quadro.height) fonte = quadro;
+        } catch (e) {
+            console.warn('obterMelhorQuadro falhou; usando frame atual do vídeo.', e);
+        }
+        const fonteW = fonte.width || fonte.videoWidth;
+        const fonteH = fonte.height || fonte.videoHeight;
+        if (!fonteW || !fonteH) {
+            setStatus('A câmera ainda está inicializando. Aguarde um instante e tente novamente.', 'warning');
+            return;
+        }
+
         const context = canvas.getContext('2d');
         const maxLargura = 900;  // saída máxima ~900x1200 (antes: 600x800 com upscale)
         const targetRatio = 3 / 4;
-        const sourceRatio = video.videoWidth / video.videoHeight;
-        let sourceWidth = video.videoWidth;
-        let sourceHeight = video.videoHeight;
+        const sourceRatio = fonteW / fonteH;
+        let sourceWidth = fonteW;
+        let sourceHeight = fonteH;
         let sourceX = 0;
         let sourceY = 0;
         if (sourceRatio > targetRatio) {
-            sourceWidth = video.videoHeight * targetRatio;
-            sourceX = (video.videoWidth - sourceWidth) / 2;
+            sourceWidth = fonteH * targetRatio;
+            sourceX = (fonteW - sourceWidth) / 2;
         } else {
-            sourceHeight = video.videoWidth / targetRatio;
-            sourceY = (video.videoHeight - sourceHeight) / 2;
+            sourceHeight = fonteW / targetRatio;
+            sourceY = (fonteH - sourceHeight) / 2;
         }
-        // Clamp anti-upscale: nunca ampliar além da resolução real do stream
+        // Clamp anti-upscale: nunca ampliar além da resolução real da fonte
         const escala = Math.min(1, maxLargura / sourceWidth);
         canvas.width = Math.round(sourceWidth * escala);
         canvas.height = Math.round(sourceHeight * escala);
@@ -464,8 +617,9 @@ document.addEventListener('DOMContentLoaded', function() {
         context.save();
         context.translate(canvas.width, 0);
         context.scale(-1, 1);  // espelha a captura igual ao preview (scaleX(-1))
-        context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+        context.drawImage(fonte, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
         context.restore();
+        if (fonte !== video && fonte.close) { try { fonte.close(); } catch (e) {} }
 
         const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
         let brightness = 0;
@@ -475,10 +629,14 @@ document.addEventListener('DOMContentLoaded', function() {
         brightness /= canvas.width * canvas.height;
         if (brightness < 80) {
             setStatus('A foto está escura. Procure um local mais iluminado.', 'warning');
+            autoCapturaDisparada = false;
+            inicioQualidadeOk = null;
             return;
         }
         if (brightness > 225) {
             setStatus('Há luz demais no rosto. Evite contraluz ou claridade direta.', 'warning');
+            autoCapturaDisparada = false;
+            inicioQualidadeOk = null;
             return;
         }
 
@@ -486,6 +644,8 @@ document.addEventListener('DOMContentLoaded', function() {
         canvas.toBlob(blob => {
             if (!blob) {
                 setStatus('Falha ao processar a foto. Tente novamente.', 'danger');
+                autoCapturaDisparada = false;
+                inicioQualidadeOk = null;
                 return;
             }
             blobCapturado = blob;
@@ -508,6 +668,8 @@ document.addEventListener('DOMContentLoaded', function() {
         video.style.display = 'block';
         captureBtn.style.display = 'block';
         captureBtn.disabled = false;
+        autoCapturaDisparada = false;   // reativa a auto-captura para a próxima foto
+        inicioQualidadeOk = null;
     });
 
     // Confirmar e continuar

@@ -105,6 +105,10 @@ class FormandoSelfiePageTests(TestCase):
         self.assertContains(resp, 'ideal: 1920')               # constraints de alta resolução
         self.assertContains(resp, 'capturarFoto')              # captura em alta resolução sem upscale
         self.assertContains(resp, 'blobCapturado')             # blob guardado em memória (sem sessionStorage)
+        self.assertContains(resp, 'flashOverlay')              # flash-iluminação no disparo
+        self.assertContains(resp, 'autoCapturaCheck')          # auto-captura opcional (Fase 3)
+        self.assertContains(resp, 'takePhoto')                 # foto full-res do hardware (ImageCapture)
+        self.assertContains(resp, 'obterMelhorQuadro')         # best-shot: melhor de 5 quadros
 
 
 class PipelineImagemSelfieTests(TestCase):
