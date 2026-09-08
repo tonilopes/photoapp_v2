@@ -565,31 +565,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Burst de exatamente 2 capturas ao centralizar:
-    // 1) até 2 takePhoto() da ImageCapture API (foto full-res do hardware, Android/Chrome);
-    // 2) falhou/recurso ausente → completa com frames do vídeo até ter 2 capturas no total.
-    // Retorna a mais nítida (variância laplaciana). Nunca mais que 2 capturas.
+    // 1) 1x takePhoto() da ImageCapture API (foto full-res do hardware) SEMPRE com
+    //    timeout: em Android/Chrome a 2ª chamada a takePhoto fica esperando toque
+    //    no obturador nativo e bloquea → só 1 takePhoto, e com límite de tempo;
+    // 2) completa o par com un frame do vídeo (rápido, automático, nunca bloquea).
+    // Retorna a más nítida (variância laplaciana). Nunca más de 2 capturas.
+    function conTimeout(ms) {
+        return new Promise((_, rejeita) => setTimeout(() => rejeita(new Error('timeout')), ms));
+    }
+
     async function obterMelhorQuadro() {
         const fontes = [];
+        const inicio = performance.now();
         if (streamAtual && 'ImageCapture' in window) {
             try {
                 const track = streamAtual.getVideoTracks()[0];
                 const captor = new ImageCapture(track);
-                for (let i = 0; i < 2 && fontes.length < 2; i++) {
-                    try {
-                        const blobFoto = await captor.takePhoto();
-                        fontes.push(await createImageBitmap(blobFoto));
-                    } catch (e) {
-                        console.warn('takePhoto #' + (i + 1) + ' falhou; completando com frame de vídeo.', e);
-                        break;
-                    }
+                // 1ª foto full-res com timeout generoso (algun hardware pide toque en el obturador)
+                try {
+                    const blobFoto = await Promise.race([captor.takePhoto(), conTimeout(1500)]);
+                    const bitmap = await createImageBitmap(blobFoto);
+                    fontes.push(bitmap);
+                } catch (e) {
+                    console.warn('takePhoto #1 falhou/timeout; burst de vídeo.', e);
                 }
+                // Para o par: NO chamamos takePhoto una 2ª vez (podría quedarse
+                // esperando el obturador nativo). Un frame del vídeo completa el burst.
             } catch (e) {
-                console.warn('ImageCapture indisponível; usando burst de vídeo.', e);
+                console.warn('ImageCapture indisponível; uso burst de vídeo.', e);
             }
         }
         if (!quadroTempCanvas) quadroTempCanvas = document.createElement('canvas');
         let guarda = 0;
-        while (fontes.length < 2 && guarda < 8) {
+        while (fontes.length < 2 && guarda < 8 && (performance.now() - inicio) < 3000) {
             guarda++;
             if (video.videoWidth && video.readyState >= 2) {
                 if (quadroTempCanvas.width !== video.videoWidth || quadroTempCanvas.height !== video.videoHeight) {
@@ -647,6 +655,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Captura em alta resolução (proporção 3:4, sem upscale, espelhada como no preview)
     async function capturarFoto() {
+        setStatus('Capturando, segure firme...', 'info', false);
         let fonte = video;  // fallback: frame atual do vídeo
         try {
             const quadro = await obterMelhorQuadro();
@@ -719,6 +728,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const url = URL.createObjectURL(blob);
             previewImg.src = url;
 
+            setStatus('Selfie capturada! Revisa a imagem e confirma.', 'success', false);
             // Mostrar preview (a detecção já está pausada durante o disparo)
             video.style.display = 'none';
             preview.style.display = 'block';
