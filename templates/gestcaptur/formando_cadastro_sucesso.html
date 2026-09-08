@@ -3,18 +3,30 @@
 
 {% block title %}Cadastro Completo - Formandos{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'gestcaptur/css/fase4_publico.css' %}">
+<link rel="manifest" href="{% static 'gestcaptur/manifest_fotoid.json' %}">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Photum Cadastro">
+<script src="{% static 'gestcaptur/js/fase4_publico.js' %}" defer></script>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <!-- Card de Sucesso -->
-            <div class="card shadow-lg border-0">
-                <div class="card-header bg-success text-white text-center py-5">
+            <div class="card f4-card">
+                <div class="card-header f4-header text-center py-5">
                     <div style="font-size: 64px; margin-bottom: 10px;">✅</div>
                     <h2 class="mb-0">Cadastro Finalizado com Sucesso!</h2>
                 </div>
 
                 <div class="card-body p-5 text-center">
+                    <!-- Stepper visual -->
+                    {% include 'gestcaptur/fase4_stepper.html' with passo=3 %}
                     <!-- Mensagem Principal -->
                     <div class="alert alert-success mb-4">
                         <h5>Obrigado, <strong>{{ aluno.nome }}!</strong></h5>
@@ -78,7 +90,7 @@
 
                     <!-- Botão de Ação -->
                     <div class="mt-5">
-                        <button type="button" class="btn btn-primary btn-lg" onclick="window.close()">
+                        <button type="button" class="btn f4-btn-primary btn-lg" onclick="window.close()">
                             Fechar
                         </button>
                     </div>
@@ -87,6 +99,9 @@
         </div>
     </div>
 </div>
+
+                    <!-- Toggle tema claro/escuro (opcional, escolha do usuário) -->
+                    <button type="button" id="f4ThemeBtn" class="f4-theme-toggle" aria-label="Alternar tema claro/escuro">🌙</button>
 
 <style>
 .info-box {

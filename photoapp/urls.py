@@ -13,6 +13,8 @@ urlpatterns = [
     path('', RedirectView.as_view(url='/dashboard/', permanent=False)),  # 🔥 Redireciona a raiz para dashboard
     # Service Worker do painel interno servido na raiz para ter escopo '/' (PWA)
     path('sw.js', TemplateView.as_view(template_name='sw.js', content_type='application/javascript'), name='service_worker'),
+    # Service Worker do fluxo público de formandos (fotoid), também escopo '/'
+    path('sw_fotoid.js', TemplateView.as_view(template_name='sw_fotoid.js', content_type='application/javascript'), name='service_worker_fotoid'),
     path('admin/', admin.site.urls),
     path('', include('gestcaptur.urls')),
 ]

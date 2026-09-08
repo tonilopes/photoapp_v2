@@ -1,0 +1,22 @@
+{% comment %}
+  Stepper visual do fluxo público de formandos (Fase 4).
+  Uso: {% include 'gestcaptur/fase4_stepper.html' with passo=1 %}  (1=selfie, 2=cadastro, 3=confirmado)
+{% endcomment %}
+<div class="f4-stepper-wrap mb-5" role="group" aria-label="Progresso do cadastro">
+    <div class="f4-stepper" id="f4Stepper">
+        <div class="f4-step {% if passo >= 1 %}done{% endif %} {% if passo == 1 %}active{% endif %}">
+            <div class="f4-dot">{% if passo > 1 %}<i class="bi bi-check-circle-fill" aria-hidden="true"></i>{% else %}1{% endif %}</div>
+            <div class="f4-step-label">📸 Selfie</div>
+        </div>
+        <div class="f4-step-connector {% if passo >= 2 %}filled{% endif %}" aria-hidden="true"></div>
+        <div class="f4-step {% if passo >= 2 %}done{% endif %} {% if passo == 2 %}active{% endif %}">
+            <div class="f4-dot">{% if passo > 2 %}<i class="bi bi-check-circle-fill" aria-hidden="true"></i>{% else %}2{% endif %}</div>
+            <div class="f4-step-label">📝 Cadastro</div>
+        </div>
+        <div class="f4-step-connector {% if passo >= 3 %}filled{% endif %}" aria-hidden="true"></div>
+        <div class="f4-step {% if passo >= 3 %}done{% endif %} {% if passo == 3 %}active{% endif %}">
+            <div class="f4-dot"><i class="bi bi-check-circle-fill" aria-hidden="true"></i></div>
+            <div class="f4-step-label">✅ Confirmado</div>
+        </div>
+    </div>
+</div>

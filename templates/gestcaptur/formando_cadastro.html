@@ -3,24 +3,32 @@
 
 {% block title %}Formulário de Cadastro - Formandos{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'gestcaptur/css/fase4_publico.css' %}">
+<link rel="manifest" href="{% static 'gestcaptur/manifest_fotoid.json' %}">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Photum Cadastro">
+<script src="{% static 'gestcaptur/js/fase4_publico.js' %}" defer></script>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <!-- Card do Formulário -->
-            <div class="card shadow-lg border-0">
-                <div class="card-header bg-primary text-white py-4">
+            <div class="card f4-card">
+                <div class="card-header f4-header py-4">
                     <h3 class="mb-0">
                         <i class="bi bi-pencil-square"></i> Preencha Seu Cadastro
                     </h3>
-                    <small class="text-light">Etapa 2 de 2 - Formulário Pessoal</small>
+                    <small class="text-white-50">Etapa 2 de 2 - Formulário Pessoal</small>
                 </div>
 
                 <div class="card-body p-4">
-                    <!-- Barra de Progresso -->
-                    <div class="progress mb-4" style="height: 5px;">
-                        <div class="progress-bar bg-success" role="progressbar" style="width: 50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
+                    <!-- Stepper visual -->
+                    {% include 'gestcaptur/fase4_stepper.html' with passo=2 %}
 
                     <!-- Mensagem de Sucesso da Selfie -->
                     <div class="alert alert-success mb-4">
@@ -190,10 +198,10 @@
 
                         <!-- Botões -->
                         <div class="d-grid gap-2 d-sm-flex justify-content-sm-end mt-5">
-                            <button type="reset" class="btn btn-outline-secondary">
+                            <button type="reset" class="btn f4-btn-secondary">
                                 <i class="bi bi-arrow-counterclockwise"></i> Limpar Formulário
                             </button>
-                            <button type="submit" class="btn btn-primary btn-lg">
+                            <button type="submit" class="btn f4-btn-primary btn-lg">
                                 <i class="bi bi-check-circle"></i> Finalizar Cadastro
                             </button>
                         </div>
@@ -203,6 +211,9 @@
         </div>
     </div>
 </div>
+
+                    <!-- Toggle tema claro/escuro (opcional, escolha do usuário) -->
+                    <button type="button" id="f4ThemeBtn" class="f4-theme-toggle" aria-label="Alternar tema claro/escuro">🌙</button>
 
 <style>
 .form-control, .form-select {

@@ -3,15 +3,25 @@
 
 {% block title %}Cadastro de Formandos{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'gestcaptur/css/fase4_publico.css' %}">
+<link rel="manifest" href="{% static 'gestcaptur/manifest_fotoid.json' %}">
+<meta name="theme-color" content="#4f46e5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Photum Cadastro">
+<script src="{% static 'gestcaptur/js/fase4_publico.js' %}" defer></script>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <!-- Card Principal -->
-            <div class="card shadow-lg border-0">
-                <div class="card-header bg-primary text-white text-center py-4">
+            <div class="card f4-card">
+                <div class="card-header f4-header text-center py-4">
                     <h2 class="mb-0">📸 Cadastro de Formandos</h2>
-                    <p class="text-light mb-0 mt-2">{{ evento.fot }} - {{ evento.data|date:"d/m/Y" }}</p>
+                    <p class="mb-0 mt-2" style="color: rgba(255,255,255,.85);">{{ evento.fot }} - {{ evento.data|date:"d/m/Y" }}</p>
                 </div>
 
                 <div class="card-body p-5">
@@ -22,21 +32,8 @@
                         <p class="mb-0"><strong>Turma:</strong> {{ evento.codigo_turma|default:"Não informada" }}</p>
                     </div>
 
-                    <!-- Etapas do Processo -->
-                    <div class="row mb-5">
-                        <div class="col-md-6 text-center">
-                            <div class="step-box active">
-                                <div class="step-number">1</div>
-                                <p class="step-label">Selfie Obrigatória</p>
-                            </div>
-                        </div>
-                        <div class="col-md-6 text-center">
-                            <div class="step-box">
-                                <div class="step-number">2</div>
-                                <p class="step-label">Preenchimento do Cadastro</p>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Stepper visual -->
+                    {% include 'gestcaptur/fase4_stepper.html' with passo=1 %}
 
                     <!-- Instruções -->
                     <div class="instruction-box mb-4">
@@ -52,10 +49,13 @@
 
                     <!-- Botão para Iniciar -->
                     <div class="text-center mt-5">
-                        <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#cameraModal">
+                        <button type="button" class="btn f4-btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#cameraModal">
                             <i class="bi bi-camera"></i> Começar com Selfie
                         </button>
                     </div>
+
+                    <!-- Toggle tema claro/escuro (opcional, escolha do usuário) -->
+                    <button type="button" id="f4ThemeBtn" class="f4-theme-toggle" aria-label="Alternar tema claro/escuro">🌙</button>
 
                     <!-- Se for edição -->
                     {% if aluno %}

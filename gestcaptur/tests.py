@@ -89,6 +89,7 @@ class FormandoSelfiePageTests(TestCase):
     as melhorias de captura: countdown, modal fullscreen no mobile, constraints
     de alta resolução, captura espelhada sem upscale e o fluxo automático final
     (1 único burst de 2 fotos ao centralizar, rejeitando rosto de perfil).
+    E a Fase 4 (visual): design system (f4-card), stepper e dark mode opcional.
     """
 
     def test_pagina_selfie_formandos_renderiza_com_melhorias(self):
@@ -113,6 +114,13 @@ class FormandoSelfiePageTests(TestCase):
         self.assertContains(resp, 'takePhoto')                 # foto full-res do hardware (ImageCapture)
         self.assertContains(resp, 'obterMelhorQuadro')         # burst de 2 capturas: escolhe a melhor
         self.assertContains(resp, 'burstFeito')                # 1 único burst por centralização (não repete)
+        # Fase 4 — visual público
+        self.assertContains(resp, 'fase4_publico.css')         # design system carregado
+        self.assertContains(resp, 'fase4_publico.js')          # tema + SW público
+        self.assertContains(resp, 'manifest_fotoid.json')      # PWA público
+        self.assertContains(resp, 'f4-card')                   # card com identidade Photum
+        self.assertContains(resp, 'f4-stepper')                # stepper visual
+        self.assertContains(resp, 'f4ThemeBtn')                # toggle claro/escuro (opcional)
 
 
 class PipelineImagemSelfieTests(TestCase):

@@ -1,0 +1,272 @@
+/* ==========================================================================
+   FASE 4 — Design System público (flujo de formandos · fotoid.photum.com.br)
+   Selfie → Cadastro → Confirmado
+   Incluído SOLO nas páginas públicas (via extra_head), não toca o backoffice.
+   ========================================================================== */
+
+/* ---------- Design tokens ---------- */
+:root {
+    --photum-bg: #f6f8fc;
+    --photum-surface: #ffffff;
+    --photum-surface-2: #eef1f7;
+    --photum-text: #1f2430;
+    --photum-muted: #6b7280;
+    --photum-border: #d9dfe9;
+    --photum-grad-1: #4f46e5;
+    --photum-grad-2: #7c3aed;
+    --photum-grad-rgb: 79, 70, 229;
+    --photum-ok: #10b981;
+    --photum-warn: #f59e0b;
+    --photum-danger: #ef4444;
+    --photum-shadow: 0 10px 24px rgba(15, 23, 42, .10);
+    --photum-radius: 18px;
+    --photum-input-bg: #ffffff;
+    --photum-input-color: #1f2430;
+    --photum-input-border: #d9dfe9;
+}
+
+html[data-theme="dark"] {
+    --photum-bg: #0f1420;
+    --photum-surface: #151c2c;
+    --photum-surface-2: #1d2840;
+    --photum-text: #e6eaf3;
+    --photum-muted: #9aa4b8;
+    --photum-border: #2a3550;
+    --photum-grad-1: #6366f1;
+    --photum-grad-2: #8b5cf6;
+    --photum-grad-rgb: 99, 102, 241;
+    --photum-shadow: 0 12px 28px rgba(0, 0, 0, .45);
+    --photum-input-bg: #1a2234;
+    --photum-input-color: #e6eaf3;
+    --photum-input-border: #2e3a58;
+}
+
+/* ---------- Base ---------- */
+body {
+    background: var(--photum-bg);
+}
+
+/* ---------- Card público ---------- */
+.f4-card {
+    border: 0;
+    border-radius: var(--photum-radius);
+    background: var(--photum-surface);
+    box-shadow: var(--photum-shadow);
+}
+.f4-card .card-body,
+.f4-card .card-footer {
+    color: var(--photum-text);
+}
+.f4-header {
+    background: linear-gradient(135deg, var(--photum-grad-1), var(--photum-grad-2));
+    color: #fff;
+    border: 0;
+    border-radius: var(--photum-radius) var(--photum-radius) 0 0;
+    padding: 1.4rem 1.5rem;
+}
+.f4-header h2, .f4-header h3 {
+    color: #fff;
+}
+
+/* ---------- Stepper ---------- */
+.f4-stepper-wrap {
+    display: flex;
+    justify-content: center;
+}
+.f4-stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.f4-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 64px;
+}
+.f4-dot {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: var(--photum-surface-2);
+    color: var(--photum-muted);
+    border: 2px solid var(--photum-border);
+    font-weight: 700;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .35s ease;
+}
+.f4-step.pending .f4-dot {
+    opacity: .75;
+}
+.f4-step.done .f4-dot {
+    background: var(--photum-ok);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, .18);
+}
+.f4-step.active .f4-dot {
+    background: linear-gradient(135deg, var(--photum-grad-1), var(--photum-grad-2));
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 0 0 5px rgba(var(--photum-grad-rgb), .22);
+    transform: scale(1.12);
+    animation: f4-pulse 1.8s ease-in-out infinite;
+}
+@keyframes f4-pulse {
+    0%, 100% { box-shadow: 0 0 0 5px rgba(var(--photum-grad-rgb), .22); }
+    50%      { box-shadow: 0 0 0 10px rgba(var(--photum-grad-rgb), .08); }
+}
+.f4-step-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--photum-text);
+    margin-top: 7px;
+    max-width: 96px;
+    text-align: center;
+}
+.f4-step.pending .f4-step-label {
+    color: var(--photum-muted);
+}
+.f4-step-connector {
+    flex: 1;
+    min-width: 44px;
+    height: 5px;
+    border-radius: 4px;
+    background: var(--photum-border);
+    transition: background .45s ease;
+}
+.f4-step-connector.filled {
+    background: linear-gradient(90deg, var(--photum-grad-1), var(--photum-ok));
+}
+/* ---------- Botões primários ---------- */
+.f4-btn-primary {
+    background: linear-gradient(135deg, var(--photum-grad-1), var(--photum-grad-2));
+    border: 0;
+    color: #fff;
+    border-radius: 14px;
+    box-shadow: 0 8px 18px rgba(var(--photum-grad-rgb), .32);
+    min-height: 52px;
+    font-weight: 600;
+    padding: .75rem 2rem;
+    transition: transform .15s ease, box-shadow .2s ease;
+}
+.f4-btn-primary:active {
+    transform: scale(.97);
+}
+.f4-btn-secondary {
+    background: var(--photum-surface-2);
+    border: 1px solid var(--photum-border);
+    color: var(--photum-text);
+    border-radius: 14px;
+    min-height: 52px;
+    font-weight: 500;
+    padding: .75rem 1.6rem;
+}
+.f4-btn-secondary:hover {
+    background: var(--photum-border);
+}
+
+/* ---------- Toggle claro/escuro (flotante, decisão do usuário) ---------- */
+.f4-theme-toggle {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 0;
+    background: var(--photum-surface-2);
+    color: var(--photum-text);
+    font-size: 24px;
+    line-height: 1;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+    z-index: 2100;
+    transition: transform .2s ease;
+}
+.f4-theme-toggle:active {
+    transform: scale(.9);
+}
+
+/* ---------- Instruções / avisos (compat dark) ---------- */
+html[data-theme="dark"] .instruction-box {
+    background: #261f3a;
+    border-left: 4px solid var(--photum-grad-1);
+}
+html[data-theme="dark"] .instruction-box li,
+html[data-theme="dark"] .instruction-box h5 {
+    color: var(--photum-text);
+}
+html[data-theme="dark"] .alert {
+    background: var(--photum-surface-2);
+    color: var(--photum-text);
+}
+html[data-theme="dark"] .info-box,
+html[data-theme="dark"] .instruction-final,
+html[data-theme="dark"] .card-light {
+    background: var(--photum-surface-2);
+    border-color: var(--photum-border);
+    color: var(--photum-text);
+}
+html[data-theme="dark"] .info-value { color: var(--photum-ok); }
+
+/* ---------- Formulários: responsividade fina + anti-zoom iOS ---------- */
+.form-control, .form-select {
+    font-size: 16px; /* previene auto-zoom iOS */
+    background: var(--photum-input-bg);
+    color: var(--photum-input-color);
+    border-color: var(--photum-input-border);
+    min-height: 46px;
+    border-radius: 10px;
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--photum-grad-1);
+    box-shadow: 0 0 0 .18rem rgba(var(--photum-grad-rgb), .22);
+}
+.form-label {
+    font-weight: 600;
+    color: var(--photum-text);
+    margin-bottom: 7px;
+}
+@media (max-width: 576px) {
+    .btn, .btn-lg, button.btn { min-height: 48px; }
+}
+
+/* ---------- Modal da cámara (compat dark) ---------- */
+html[data-theme="dark"] .modal-content {
+    background: var(--photum-surface);
+    color: var(--photum-text);
+    border-color: var(--photum-border);
+}
+html[data-theme="dark"] .modal-header {
+    background: linear-gradient(135deg, var(--photum-grad-1), var(--photum-grad-2));
+    color: #fff;
+}
+html[data-theme="dark"] #cameraStatus {
+    background: var(--photum-surface-2);
+    color: var(--photum-text);
+}
+
+/* ---------- PWA: área segura (notch/gesture bar) ---------- */
+@media (display-mode: standalone) {
+    body {
+        padding-top: max(14px, env(safe-area-inset-top));
+        padding-bottom: max(14px, env(safe-area-inset-bottom));
+    }
+}
+
+/* ---------- Micro-animaciones ---------- */
+.f4-card {
+    animation: f4-entrance .45s ease;
+}
+@keyframes f4-entrance {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .f4-card { animation: none; }
+    .f4-step.active .f4-dot { animation: none; }
+}
