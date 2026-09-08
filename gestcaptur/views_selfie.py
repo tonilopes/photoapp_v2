@@ -17,6 +17,7 @@ import io
 import logging
 
 from .models import Aluno, Evento
+from gestcaptur.utils.imagens import processar_selfie
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,11 @@ def salvar_selfie_publico(request):
                     'message': 'Imagem muito clara/superexposta. Reduza a iluminação ou mude de posição.',
                     'brightness': avg_brightness
                 }, status=400)
+
+            # Fase 2: pipeline de imagem (EXIF-rotate, máx 1200px, autocontraste, JPEG otimizado)
+            # Reprocessa também o base64 para que a selfie guardada em sessão já saia otimizada
+            image_bytes, _, _ = processar_selfie(image_bytes)
+            image_data_base64 = base64.b64encode(image_bytes).decode('ascii')
 
             # Se aluno_id fornecido, tentar ligar selfie ao aluno
             if aluno_id:
@@ -326,7 +332,10 @@ def salvar_selfie_obrigatoria(request):
                 'success': False,
                 'error': f'Selfie rejeitada: {msg}. Tente novamente.'
             }, status=400)
-        
+
+        # Fase 2: pipeline de imagem (EXIF-rotate, máx 1200px, autocontraste, JPEG otimizado)
+        image_bytes, _, _ = processar_selfie(image_bytes)
+
         # Salvar foto no aluno
         # 🔒 NOVO: "NOME COMPLETO.JPG" (maiúsculas com espaços)
         nome_arquivo = f"{aluno.nome.strip().upper()}.JPG"

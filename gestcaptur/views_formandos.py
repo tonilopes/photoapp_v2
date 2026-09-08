@@ -21,6 +21,8 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from PIL import Image, UnidentifiedImageError
 
+from gestcaptur.utils.imagens import processar_selfie
+
 from .models import Evento, Aluno, Usuario
 from .forms import AlunoCadastroForm
 from .decorators import role_required, evento_permission_required
@@ -173,6 +175,10 @@ def _processar_selfie(request, evento):
     nome_temp = f"selfie-{uuid.uuid4()}.jpg"
     
     try:
+        # Fase 2: pipeline de imagem (EXIF-rotate, máx 1200px, autocontraste suave, JPEG otimizado)
+        foto.seek(0)
+        image_bytes, _, _ = processar_selfie(foto.read())
+
         # Salvar foto temporária na sessão ou em arquivo
         request.session['selfie_data'] = {
             'nome_arquivo': nome_temp,
@@ -184,8 +190,7 @@ def _processar_selfie(request, evento):
         os.makedirs(os.path.dirname(temp_path), exist_ok=True)
         
         with open(temp_path, 'wb') as f:
-            for chunk in foto.chunks():
-                f.write(chunk)
+            f.write(image_bytes)
         
         return JsonResponse({
             'sucesso': True,
