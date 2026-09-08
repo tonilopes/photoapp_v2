@@ -19,6 +19,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+@never_cache
+@login_required  # ✅ Restaura proteção perdida na extração do views.py (AnonymousUser causava 500 no fotoid)
 def dashboard(request):
 
     logger.info(f"📊 DASHBOARD: User={request.user}")
@@ -146,6 +148,8 @@ def dashboard(request):
     return render(request, 'gestcaptur/gestor_dashboard.html', context)
 
 
+@never_cache
+@login_required
 def dashboard_coordenador(request):
     logger.info(f"Usuário logado: {request.user} (ID: {request.user.id})")
     # AQUI ESTÁ O FILTRO PRINCIPAL para eventos do coordenador logado
@@ -192,6 +196,8 @@ def dashboard_coordenador(request):
     return render(request, 'gestcaptur/dashboard_coordenador.html', context)
 
 
+@never_cache
+@login_required
 def dashboard_coordenador_fotografo(request):
     """
     Dashboard híbrido para coordenadores que também atuam como fotógrafos
@@ -318,6 +324,8 @@ def dashboard_coordenador_fotografo(request):
     return render(request, 'gestcaptur/dashboard_coordenador_fotografo.html', context)
 
 
+@never_cache
+@login_required
 def teste_dashboard_hibrido(request):
     """View de teste para debug"""
     from django.http import JsonResponse
@@ -360,6 +368,8 @@ def teste_dashboard_hibrido(request):
     return JsonResponse(dados, indent=2)
 
 
+@never_cache
+@login_required
 def dashboard_inteligente(request):
     """
     Dashboard inteligente que redireciona baseado no role e situação do usuário
@@ -392,6 +402,8 @@ def dashboard_inteligente(request):
         return redirect('login')
 
 
+@never_cache
+@login_required
 def api_dashboard_coordenador(request):
     filtros = {
         'fot': request.GET.get('fot'),
@@ -401,6 +413,8 @@ def api_dashboard_coordenador(request):
     return JsonResponse({'eventos': eventos_data})
 
 
+@never_cache
+@login_required
 def fichas_cadastradas(request):
     fot = request.GET.get('fot', '')
     empresa = request.GET.get('empresa', '')
@@ -432,6 +446,8 @@ def fichas_cadastradas(request):
     })
 
 
+@never_cache
+@login_required
 def fotografo_dashboard(request):
     fotografo = request.user
     
@@ -471,6 +487,8 @@ def fotografo_dashboard(request):
     return render(request, 'gestcaptur/fotografo_dashboard.html', context)
 
 
+@never_cache
+@login_required
 def parceiro_dashboard(request):
     """Dashboard simplificado para parceiros - mostra apenas eventos aos quais têm acesso"""
     parceiro = request.user
@@ -514,6 +532,8 @@ def parceiro_dashboard(request):
     return render(request, 'gestcaptur/parceiro_dashboard.html', context)
 
 
+@never_cache
+@login_required
 def eventos_gestor(request):
     """
     Página principal de gerenciamento de eventos para o gestor
@@ -573,6 +593,8 @@ def eventos_gestor(request):
     return render(request, 'gestcaptur/eventos_gestor.html', context)
 
 
+@never_cache
+@login_required
 def eventos_andamento(request):
     eventos = Evento.objects.filter(status='iniciado') # Alterado de 'andamento' para 'iniciado'
 
@@ -580,6 +602,8 @@ def eventos_andamento(request):
     return render(request, 'gestcaptur/eventos_andamento.html', context)
 
 
+@never_cache
+@login_required
 def eventos_finalizados(request):
     eventos = Evento.objects.filter(status='finalizado').order_by('-data')
     for evento in eventos:
@@ -588,6 +612,8 @@ def eventos_finalizados(request):
     return render(request, 'gestcaptur/eventos_finalizados.html', {'eventos': eventos})
 
 
+@never_cache
+@login_required
 def eventos_historico(request):
     eventos = Evento.objects.filter(status='finalizado').order_by('-data')
 
@@ -613,6 +639,8 @@ def eventos_historico(request):
     })
 
 
+@never_cache
+@login_required
 def dashboard_pesquisa(request):
     eventos = Evento.objects.all().order_by('-data')
     # Adicionar contagens de fotos, alunos, etc. para cada evento
