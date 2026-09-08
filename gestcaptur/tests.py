@@ -2,6 +2,8 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
+from gestcaptur.models import Evento
+
 Usuario = get_user_model()
 
 
@@ -72,4 +74,28 @@ class DashboardProtecaoLoginTests(TestCase):
         resp = self.client.get(reverse('dashboard_inteligente'))
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp['Location'], reverse('dashboard'))
+
+
+class FormandoSelfiePageTests(TestCase):
+    """
+    A página pública de selfie dos formandos (fotoid) deve renderizar contendo
+    as melhorias de captura da Fase 1: countdown, modal fullscreen no mobile,
+    constraints de alta resolução e captura espelhada sem upscale.
+    """
+
+    def test_pagina_selfie_formandos_renderiza_com_melhorias(self):
+        evento = Evento.objects.create(
+            fot='TESTE-001',
+            data='2026-09-08',
+            para_selfie=True,
+            uuid='aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        )
+        url = reverse('formando_selfie_cadastro_uuid', kwargs={'evento_uuid': evento.uuid})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'countdownOverlay')          # countdown 3-2-1
+        self.assertContains(resp, 'modal-fullscreen-sm-down')  # modal fullscreen no mobile
+        self.assertContains(resp, 'ideal: 1920')               # constraints de alta resolução
+        self.assertContains(resp, 'capturarFoto')              # captura em alta resolução sem upscale
+        self.assertContains(resp, 'blobCapturado')             # blob guardado em memória (sem sessionStorage)
 

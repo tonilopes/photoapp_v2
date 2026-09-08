@@ -79,7 +79,7 @@
 
 <!-- Modal de Câmera -->
 <div class="modal fade" id="cameraModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">📸 Captura de Selfie</h5>
@@ -89,6 +89,7 @@
                 <div class="camera-frame" id="cameraFrame">
                     <video id="video" autoplay playsinline></video>
                     <div class="face-guide" aria-hidden="true"></div>
+                    <div class="countdown-overlay" id="countdownOverlay" aria-hidden="true"><span id="countdownNumber">3</span></div>
                 </div>
                 <div id="cameraStatus" class="alert alert-info mt-3" role="status" aria-live="polite">
                     Permita o acesso à câmera. Vamos orientar seu enquadramento.
@@ -171,7 +172,7 @@
 
 .camera-frame {
     position: relative;
-    width: min(100%, 360px);
+    width: min(100%, 420px);
     aspect-ratio: 3 / 4;
     margin: 0 auto;
     overflow: hidden;
@@ -199,9 +200,35 @@
     pointer-events: none;
 }
 
+/* Overlay do countdown 3-2-1 */
+.countdown-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, .35);
+    z-index: 5;
+    pointer-events: none;
+}
+
+.countdown-overlay span {
+    font-size: 96px;
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 4px 24px rgba(0, 0, 0, .6);
+    animation: countdown-pop .8s ease-out infinite;
+}
+
+@keyframes countdown-pop {
+    0%   { transform: scale(1.6); opacity: .2; }
+    30%  { transform: scale(1);   opacity: 1; }
+    100% { transform: scale(.9);  opacity: .85; }
+}
+
 @media (max-width: 576px) {
     .modal-body { padding: 12px !important; }
-    .camera-frame { width: min(100%, 320px); }
+    .camera-frame { width: 100%; }
 }
 </style>
 
@@ -216,8 +243,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewImg = document.getElementById('previewImg');
     const cameraModal = document.getElementById('cameraModal');
     const cameraStatus = document.getElementById('cameraStatus');
+    const countdownOverlay = document.getElementById('countdownOverlay');
+    const countdownNumber = document.getElementById('countdownNumber');
     let faceDetector = null;
     let guidanceFrame = null;
+    let countdownTimer = null;
+    let blobCapturado = null;
     let faceOk = false;
     let detectorUnavailable = false;
     let lastSpoken = '';
@@ -344,9 +375,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Iniciar câmera ao abrir modal
     cameraModal.addEventListener('shown.bs.modal', function() {
-        navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'user' },
-            audio: false 
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'user',
+                width:  { ideal: 1920 },   // pede alta resolução ao hardware
+                height: { ideal: 1440 }
+            },
+            audio: false
         }).then(stream => {
             video.srcObject = stream;
             video.play();
@@ -366,7 +401,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (guidanceFrame) cancelAnimationFrame(guidanceFrame);
     });
 
-    // Capturar foto
+    // Capturar foto: inicia countdown 3-2-1 (reduz blur por movimento)
     captureBtn.addEventListener('click', function() {
         if (detectorUnavailable) {
             setStatus('Não foi possível ativar a validação facial. Verifique a conexão e tente novamente.', 'danger');
@@ -376,11 +411,40 @@ document.addEventListener('DOMContentLoaded', function() {
             setStatus('Ajuste seu rosto no contorno antes de capturar.', 'warning');
             return;
         }
+        let restante = 3;
+        captureBtn.disabled = true;
+        countdownOverlay.style.display = 'flex';
+        countdownNumber.textContent = restante;
+        clearInterval(countdownTimer);
+        countdownTimer = setInterval(function() {
+            if (!faceOk) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+                countdownOverlay.style.display = 'none';
+                captureBtn.disabled = false;
+                setStatus('Rosto saiu do enquadramento. Encaixe novamente e toque em capturar.', 'warning');
+                return;
+            }
+            restante -= 1;
+            if (restante <= 0) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+                countdownOverlay.style.display = 'none';
+                captureBtn.disabled = false;
+                capturarFoto();
+                if (navigator.vibrate) navigator.vibrate(60);
+            } else {
+                countdownNumber.textContent = restante;
+            }
+        }, 800);
+    });
+
+    // Captura em alta resolução (proporção 3:4, sem upscale, espelhada como no preview)
+    function capturarFoto() {
         const context = canvas.getContext('2d');
-        const targetWidth = 600;
-        const targetHeight = 800;
+        const maxLargura = 900;  // saída máxima ~900x1200 (antes: 600x800 com upscale)
+        const targetRatio = 3 / 4;
         const sourceRatio = video.videoWidth / video.videoHeight;
-        const targetRatio = targetWidth / targetHeight;
         let sourceWidth = video.videoWidth;
         let sourceHeight = video.videoHeight;
         let sourceX = 0;
@@ -392,16 +456,23 @@ document.addEventListener('DOMContentLoaded', function() {
             sourceHeight = video.videoWidth / targetRatio;
             sourceY = (video.videoHeight - sourceHeight) / 2;
         }
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+        // Clamp anti-upscale: nunca ampliar além da resolução real do stream
+        const escala = Math.min(1, maxLargura / sourceWidth);
+        canvas.width = Math.round(sourceWidth * escala);
+        canvas.height = Math.round(sourceHeight * escala);
 
-        const pixels = context.getImageData(0, 0, targetWidth, targetHeight).data;
+        context.save();
+        context.translate(canvas.width, 0);
+        context.scale(-1, 1);  // espelha a captura igual ao preview (scaleX(-1))
+        context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+        context.restore();
+
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
         let brightness = 0;
         for (let index = 0; index < pixels.length; index += 4) {
             brightness += (pixels[index] * .299) + (pixels[index + 1] * .587) + (pixels[index + 2] * .114);
         }
-        brightness /= targetWidth * targetHeight;
+        brightness /= canvas.width * canvas.height;
         if (brightness < 80) {
             setStatus('A foto está escura. Procure um local mais iluminado.', 'warning');
             return;
@@ -411,33 +482,40 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Converter para blob e mostrar preview
+        // Converter para blob (JPEG alta qualidade) e mostrar preview
         canvas.toBlob(blob => {
+            if (!blob) {
+                setStatus('Falha ao processar a foto. Tente novamente.', 'danger');
+                return;
+            }
+            blobCapturado = blob;
             const url = URL.createObjectURL(blob);
             previewImg.src = url;
             
-            // Armazenar blob na sessão
-            sessionStorage.setItem('selfie_blob', JSON.stringify({
-                url: url,
-                timestamp: new Date().toISOString()
-            }));
+            // (blob guardado em blobCapturado; o sessionStorage não guardava a imagem)
 
             // Mostrar preview
             video.style.display = 'none';
             captureBtn.style.display = 'none';
             preview.style.display = 'block';
         }, 'image/jpeg', 0.95);
-    });
+    }
 
     // Tirar novamente
     retakeBtn.addEventListener('click', function() {
+        blobCapturado = null;
         preview.style.display = 'none';
         video.style.display = 'block';
         captureBtn.style.display = 'block';
+        captureBtn.disabled = false;
     });
 
     // Confirmar e continuar
     confirmBtn.addEventListener('click', function() {
+        if (!blobCapturado) {
+            setStatus('Capture a selfie antes de confirmar.', 'warning');
+            return;
+        }
         confirmBtn.disabled = true;
         confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processando...';
         

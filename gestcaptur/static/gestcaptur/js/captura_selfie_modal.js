@@ -8,10 +8,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Configurações
   const CONFIG_SELFIE = {
-    width: 600,
-    height: 800,
-    quality: 0.85,
-    maxSizeKB: 700
+    width: 900,     // antes 600 — alta resolução (pede 1920x1440 à câmera)
+    height: 1200,   // antes 800
+    quality: 0.9,   // antes 0.85
+    maxSizeKB: 900
   };
 
   let imagemCapturada = null;
