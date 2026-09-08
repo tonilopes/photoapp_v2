@@ -86,8 +86,9 @@ class DashboardProtecaoLoginTests(TestCase):
 class FormandoSelfiePageTests(TestCase):
     """
     A página pública de selfie dos formandos (fotoid) deve renderizar contendo
-    as melhorias de captura da Fase 1: countdown, modal fullscreen no mobile,
-    constraints de alta resolução e captura espelhada sem upscale.
+    as melhorias de captura: countdown, modal fullscreen no mobile, constraints
+    de alta resolução, captura espelhada sem upscale e o fluxo automático final
+    (1 único burst de 2 fotos ao centralizar, rejeitando rosto de perfil).
     """
 
     def test_pagina_selfie_formandos_renderiza_com_melhorias(self):
@@ -106,9 +107,12 @@ class FormandoSelfiePageTests(TestCase):
         self.assertContains(resp, 'capturarFoto')              # captura em alta resolução sem upscale
         self.assertContains(resp, 'blobCapturado')             # blob guardado em memória (sem sessionStorage)
         self.assertContains(resp, 'flashOverlay')              # flash-iluminação no disparo
-        self.assertContains(resp, 'autoCapturaCheck')          # auto-captura opcional (Fase 3)
+        self.assertContains(resp, 'captureFallbackBtn')        # botão manual só se o detector falhar
+        self.assertContains(resp, 'btnTentarNovamente')        # recuperação amigável pós-falha
+        self.assertContains(resp, 'dePerfil')                  # rejeita rosto de lado (pose)
         self.assertContains(resp, 'takePhoto')                 # foto full-res do hardware (ImageCapture)
-        self.assertContains(resp, 'obterMelhorQuadro')         # best-shot: melhor de 5 quadros
+        self.assertContains(resp, 'obterMelhorQuadro')         # burst de 2 capturas: escolhe a melhor
+        self.assertContains(resp, 'burstFeito')                # 1 único burst por centralização (não repete)
 
 
 class PipelineImagemSelfieTests(TestCase):

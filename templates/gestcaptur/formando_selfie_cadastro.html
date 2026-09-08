@@ -96,16 +96,12 @@
                     Permita o acesso à câmera. Vamos orientar seu enquadramento.
                 </div>
                 
-                <div class="form-check form-switch mt-2 mb-1">
-                    <input class="form-check-input" type="checkbox" id="autoCapturaCheck" checked>
-                    <label class="form-check-label" for="autoCapturaCheck">
-                        Captura automática quando o enquadramento estiver ideal
-                    </label>
-                </div>
-
-                <div class="mt-2 mb-3">
-                    <button type="button" class="btn btn-success" id="captureBtn">
+                <div class="mt-2 mb-3 d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-success d-none" id="captureFallbackBtn">
                         <i class="bi bi-camera-fill"></i> Capturar Foto
+                    </button>
+                    <button type="button" class="btn btn-outline-primary d-none" id="btnTentarNovamente">
+                        <i class="bi bi-arrow-clockwise"></i> Tentar novamente
                     </button>
                 </div>
 
@@ -260,7 +256,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const captureBtn = document.getElementById('captureBtn');
     const retakeBtn = document.getElementById('retakeBtn');
     const confirmBtn = document.getElementById('confirmBtn');
     const preview = document.getElementById('preview');
@@ -270,18 +265,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const countdownOverlay = document.getElementById('countdownOverlay');
     const countdownNumber = document.getElementById('countdownNumber');
     const flashOverlay = document.getElementById('flashOverlay');
-    const autoCapturaCheck = document.getElementById('autoCapturaCheck');
-    let faceDetector = null;
+    const btnTentarNovamente = document.getElementById('btnTentarNovamente');
+    const captureFallbackBtn = document.getElementById('captureFallbackBtn');
+    let faceLandmarker = null;
     let guidanceFrame = null;
+    let guiasAtivas = true;            // loop de orientação ativo (pausa durante captura/preview)
     let countdownTimer = null;
     let blobCapturado = null;
     let streamAtual = null;            // guardado p/ ImageCapture.takePhoto()
     let inicioQualidadeOk = null;      // acumula tempo de enquadramento ideal (auto-captura)
-    let autoCapturaDisparada = false;
+    let capturando = false;            // disparo em andamento (takePhoto/toBlob)
+    let burstFeito = false;            // um burst (2 fotos) já foi feito nesta tentativa — não repete
+    const TEMPO_ESTAVEL_MS = 900;      // rosto centralizado por ~0,9s dispara o burst único
     let pontuacaoCanvas = null;
     let pontuacaoCtx = null;
     let quadroTempCanvas = null;
-    let melhorQuadroCanvas = null;
     let faceOk = false;
     let detectorUnavailable = false;
     let lastSpoken = '';
@@ -345,47 +343,89 @@ document.addEventListener('DOMContentLoaded', function() {
         if (voice) speak(message);
     }
 
-    async function loadFaceDetector() {
+    // Pausa/retoma o loop de orientação (parado durante a captura e o preview)
+    function pararGuias() {
+        guiasAtivas = false;
+        if (guidanceFrame) cancelAnimationFrame(guidanceFrame);
+        guidanceFrame = null;
+        faceOk = false;
+    }
+
+    function iniciarGuias() {
+        guiasAtivas = true;
+        if (guidanceFrame === null) guidanceFrame = requestAnimationFrame(updateGuidance);
+    }
+
+    // Falha amigável: avisa + mostra "Tentar novamente" e volta a orientar o enquadramento
+    function falharTentativa(mensagem, tipo = 'warning') {
+        setStatus(mensagem, tipo);
+        btnTentarNovamente.classList.remove('d-none');
+        iniciarGuias();
+    }
+
+    async function loadFaceLandmarker() {
         try {
             const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.20/+esm');
             const fileset = await vision.FilesetResolver.forVisionTasks(
                 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.20/wasm'
             );
-            faceDetector = await vision.FaceDetector.createFromOptions(fileset, {
+            // FaceLandmarker (478 pontos) permite validar a POSE do rosto (perfil vs frontal)
+            faceLandmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
                 baseOptions: {
-                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'
+                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+                    delegate: 'GPU'
                 },
                 runningMode: 'VIDEO',
-                minDetectionConfidence: 0.65
+                numFaces: 2
             });
             updateGuidance();
         } catch (error) {
             detectorUnavailable = true;
-            setStatus('Centralize seu rosto, olhe para a câmera e procure um local iluminado.', 'warning');
+            captureFallbackBtn.classList.remove('d-none');
+            setStatus('Não foi possível ativar a verificação facial. Use o botão "Capturar Foto".', 'danger', false);
         }
     }
 
     function updateGuidance() {
-        if (!faceDetector || video.readyState < 2) return;
+        if (!guiasAtivas) return;          // parado durante captura/preview
+        if (!faceLandmarker || video.readyState < 2) return;
         if (!faceOk) inicioQualidadeOk = null;  // saiu do enquadramento: zera acumulação
-        const result = faceDetector.detectForVideo(video, performance.now());
-        const detections = result.detections || [];
+        const result = faceLandmarker.detectForVideo(video, performance.now());
+        const faces = result.faceLandmarks || [];
         faceOk = false;
-        if (!detections.length) {
+        if (!faces.length) {
             setStatus('Nenhum rosto encontrado. Aproxime o rosto e olhe para a câmera.', 'warning');
-        } else if (detections.length > 1) {
+        } else if (faces.length > 1) {
             setStatus('Há mais de um rosto. Fique sozinho na frente da câmera.', 'warning');
         } else {
-            const box = detections[0].boundingBox;
-            const centerX = box.originX + box.width / 2;
-            const centerY = box.originY + box.height / 2;
+            const pontos = faces[0];
+            let minX = 1, maxX = 0, minY = 1, maxY = 0;
+            for (let i = 0; i < pontos.length; i++) {
+                const p = pontos[i];
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            }
+            const larguraRosto = (maxX - minX) * video.videoWidth;
+            const centerX = ((minX + maxX) / 2) * video.videoWidth;
+            const centerY = ((minY + maxY) / 2) * video.videoHeight;
             const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * .18 &&
                 Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * .22;
-            const correctSize = box.width > video.videoWidth * .22 && box.width < video.videoWidth * .82;
+            const correctSize = larguraRosto > video.videoWidth * .22 && larguraRosto < video.videoWidth * .82;
+            // Pose: nariz (ponto 1) deslocado do meio dos olhos (33, 263) = rosto de lado
+            const olhoE = pontos[33], olhoD = pontos[263], nariz = pontos[1];
+            const distOlhos = Math.hypot(olhoD.x - olhoE.x, olhoD.y - olhoE.y) || 1e-6;
+            const desvioNariz = Math.abs((nariz.x - (olhoE.x + olhoD.x) / 2) / distOlhos);
+            const larguraRostoNorm = (maxX - minX) || 1e-6;
+            const proporcaoPerfil = distOlhos / larguraRostoNorm;   // baixa = vista de lado (olhos encurtados)
+            const dePerfil = desvioNariz > 0.12 || proporcaoPerfil < 0.22;
             if (!centered) {
                 setStatus('Centralize seu rosto dentro do contorno.', 'warning');
             } else if (!correctSize) {
-                setStatus(box.width < video.videoWidth * .22 ? 'Aproxime um pouco o rosto.' : 'Afaste um pouco o rosto.', 'warning');
+                setStatus(larguraRosto < video.videoWidth * .22 ? 'Aproxime um pouco o rosto.' : 'Afaste um pouco o rosto.', 'warning');
+            } else if (dePerfil) {
+                setStatus('Vire o rosto de frente para a câmera, sem ficar de perfil.', 'warning');
             } else {
                 const agora = performance.now();
                 if (agora - ultimaAvaliacaoQualidade > 350) {
@@ -400,20 +440,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     setStatus('Imagem borrada. Segure o celular firme e aguarde o foco.', 'warning');
                 } else {
                     faceOk = true;
-                    setStatus('Rosto centralizado. Você pode capturar.', 'success', false);
-                    // Fase 3: auto-captura — enquadramento ideal por 1,5s dispara o countdown
+                    setStatus('Perfeito! Aguarde, vamos capturar...', 'success', false);
+                    // Auto-captura: rosto estável por ~0,9s → UM único burst (2 fotos, sem repetição)
                     if (inicioQualidadeOk === null) inicioQualidadeOk = performance.now();
-                    if (autoCapturaCheck.checked && !autoCapturaDisparada && !countdownTimer &&
+                    if (!burstFeito && !capturando && !countdownTimer &&
                         preview.style.display === 'none' &&
-                        (performance.now() - inicioQualidadeOk) >= 1500) {
-                        autoCapturaDisparada = true;
-                        setStatus('Enquadramento ideal! Capturando automaticamente...', 'success', false);
-                        iniciarCountdown();
+                        (performance.now() - inicioQualidadeOk) >= TEMPO_ESTAVEL_MS) {
+                        burstFeito = true;
+                        setStatus('Enquadramento ideal! Capturando...', 'success', false);
+                        iniciarCountdown(2, 500);
                     }
                 }
             }
         }
-        guidanceFrame = requestAnimationFrame(updateGuidance);
+        if (guiasAtivas) {
+            guidanceFrame = requestAnimationFrame(updateGuidance);
+        } else {
+            guidanceFrame = null;
+        }
     }
 
     // Iniciar câmera ao abrir modal
@@ -430,7 +474,8 @@ document.addEventListener('DOMContentLoaded', function() {
             video.srcObject = stream;
             video.play();
             setStatus('Analise do rosto iniciando. Olhe para a câmera.', 'info', false);
-            loadFaceDetector();
+            guiasAtivas = true;
+            loadFaceLandmarker();
         }).catch(err => {
             alert('Erro ao acessar câmera: ' + err.message);
             console.error(err);
@@ -449,39 +494,42 @@ document.addEventListener('DOMContentLoaded', function() {
             countdownTimer = null;
             countdownOverlay.style.display = 'none';
             flashOverlay.classList.remove('solid');
-            captureBtn.disabled = false;
         }
-        autoCapturaDisparada = false;
+        capturando = false;
+        burstFeito = false;
+        inicioQualidadeOk = null;
+        btnTentarNovamente.classList.add('d-none');
     });
 
-    // Capturar foto: inicia countdown 3-2-1 (reduz blur por movimento)
-    captureBtn.addEventListener('click', function() {
-        if (detectorUnavailable) {
-            setStatus('Não foi possível ativar a validação facial. Verifique a conexão e tente novamente.', 'danger');
-            return;
-        }
-        if (!faceOk) {
-            setStatus('Ajuste seu rosto no contorno antes de capturar.', 'warning');
-            return;
-        }
-        iniciarCountdown();
+    // Falha/câmera fria → o usuário recomeça o enquadramento (novo burst único)
+    btnTentarNovamente.addEventListener('click', function() {
+        burstFeito = false;
+        inicioQualidadeOk = null;
+        btnTentarNovamente.classList.add('d-none');
+        setStatus('Beleza! Enquadre o rosto novamente.', 'info', false);
+        iniciarGuias();
     });
 
-    function iniciarCountdown() {
-        if (countdownTimer) return;  // countdown já em andamento
-        let restante = 3;
-        captureBtn.disabled = true;
+    // Fallback manual: só aparece se o detector de rosto falhar
+    captureFallbackBtn.addEventListener('click', function() {
+        if (countdownTimer || capturando) return;
+        burstFeito = true;
+        iniciarCountdown(2, 500);
+    });
+
+    function iniciarCountdown(ticks = 3, intervalo = 800) {
+        if (countdownTimer || capturando) return;  // já em andamento
+        let restante = ticks;
         countdownOverlay.style.display = 'flex';
         countdownNumber.textContent = restante;
         countdownTimer = setInterval(function() {
-            if (!faceOk) {
+            if (!detectorUnavailable && !faceOk) {
                 clearInterval(countdownTimer);
                 countdownTimer = null;
                 countdownOverlay.style.display = 'none';
-                captureBtn.disabled = false;
-                autoCapturaDisparada = false;
                 inicioQualidadeOk = null;
-                setStatus('Rosto saiu do enquadramento. Encaixe novamente e toque em capturar.', 'warning');
+                burstFeito = false;     // nada foi capturado: volta a armar a auto-captura
+                setStatus('Rosto saiu do enquadramento. Encaixe novamente, a captura é automática.', 'warning');
                 return;
             }
             restante -= 1;
@@ -489,64 +537,83 @@ document.addEventListener('DOMContentLoaded', function() {
                 clearInterval(countdownTimer);
                 countdownTimer = null;
                 countdownOverlay.style.display = 'none';
-                captureBtn.disabled = false;
                 dispararCaptura();
             } else {
                 countdownNumber.textContent = restante;
             }
-        }, 800);
+        }, intervalo);
     }
 
     function dispararCaptura() {
+        if (faceLandmarker && !faceOk) {
+            burstFeito = false;
+            setStatus('Rosto de lado ou fora do contorno. Enquadre novamente.', 'warning');
+            iniciarGuias();
+            return;
+        }
+        capturando = true;
+        pararGuias();   // congela a orientação durante o disparo (evita mensagens piscando)
         if (navigator.vibrate) navigator.vibrate(60);
         // Flash-iluminação: tela branca por ~300ms ilumina o rosto antes do disparo
         flashOverlay.classList.add('solid');
         setTimeout(function() {
             Promise.resolve(capturarFoto()).finally(function() {
                 flashOverlay.classList.remove('solid');  // fade rápido = feedback do shutter
+                capturando = false;
             });
         }, 300);
     }
 
-    // Escolhe a melhor fonte disponível para o disparo:
-    // 1) takePhoto() da ImageCapture API — foto full-res do hardware (Android/Chrome);
-    // 2) fallback: best-shot — 5 quadros do vídeo, guarda o mais nítido (variância laplaciana).
+    // Burst de exatamente 2 capturas ao centralizar:
+    // 1) até 2 takePhoto() da ImageCapture API (foto full-res do hardware, Android/Chrome);
+    // 2) falhou/recurso ausente → completa com frames do vídeo até ter 2 capturas no total.
+    // Retorna a mais nítida (variância laplaciana). Nunca mais que 2 capturas.
     async function obterMelhorQuadro() {
-        try {
-            if (streamAtual && 'ImageCapture' in window) {
+        const fontes = [];
+        if (streamAtual && 'ImageCapture' in window) {
+            try {
                 const track = streamAtual.getVideoTracks()[0];
                 const captor = new ImageCapture(track);
-                const blobFoto = await captor.takePhoto();
-                const bitmap = await createImageBitmap(blobFoto);
-                return bitmap;
+                for (let i = 0; i < 2 && fontes.length < 2; i++) {
+                    try {
+                        const blobFoto = await captor.takePhoto();
+                        fontes.push(await createImageBitmap(blobFoto));
+                    } catch (e) {
+                        console.warn('takePhoto #' + (i + 1) + ' falhou; completando com frame de vídeo.', e);
+                        break;
+                    }
+                }
+            } catch (e) {
+                console.warn('ImageCapture indisponível; usando burst de vídeo.', e);
             }
-        } catch (e) {
-            console.warn('takePhoto indisponível; usando best-shot de vídeo.', e);
         }
-
         if (!quadroTempCanvas) quadroTempCanvas = document.createElement('canvas');
-        if (!melhorQuadroCanvas) melhorQuadroCanvas = document.createElement('canvas');
-        let melhorScore = -1;
-        for (let i = 0; i < 5; i++) {
+        let guarda = 0;
+        while (fontes.length < 2 && guarda < 8) {
+            guarda++;
             if (video.videoWidth && video.readyState >= 2) {
                 if (quadroTempCanvas.width !== video.videoWidth || quadroTempCanvas.height !== video.videoHeight) {
                     quadroTempCanvas.width = video.videoWidth;
                     quadroTempCanvas.height = video.videoHeight;
                 }
                 quadroTempCanvas.getContext('2d').drawImage(video, 0, 0);
-                const score = pontuarNitidez(quadroTempCanvas);
-                if (score > melhorScore) {
-                    melhorScore = score;
-                    if (melhorQuadroCanvas.width !== quadroTempCanvas.width || melhorQuadroCanvas.height !== quadroTempCanvas.height) {
-                        melhorQuadroCanvas.width = quadroTempCanvas.width;
-                        melhorQuadroCanvas.height = quadroTempCanvas.height;
-                    }
-                    melhorQuadroCanvas.getContext('2d').drawImage(quadroTempCanvas, 0, 0);
-                }
+                const quadro = document.createElement('canvas');
+                quadro.width = quadroTempCanvas.width;
+                quadro.height = quadroTempCanvas.height;
+                quadro.getContext('2d').drawImage(quadroTempCanvas, 0, 0);
+                fontes.push(quadro);
             }
-            await new Promise(r => setTimeout(r, 110));
+            await new Promise(r => setTimeout(r, 100));
         }
-        return melhorQuadroCanvas;
+        if (!fontes.length) return null;
+        // Escolhe a mais nítida entre as capturas
+        let melhor = fontes[0];
+        let melhorScore = pontuarNitidez(melhor);
+        for (let i = 1; i < fontes.length; i++) {
+            const s = pontuarNitidez(fontes[i]);
+            if (s > melhorScore) { melhorScore = s; melhor = fontes[i]; }
+        }
+        return melhor;
     }
 
     // Pontua nitidez (variância laplaciana) em amostra reduzida — quanto maior, mais nítido
@@ -590,7 +657,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const fonteW = fonte.width || fonte.videoWidth;
         const fonteH = fonte.height || fonte.videoHeight;
         if (!fonteW || !fonteH) {
-            setStatus('A câmera ainda está inicializando. Aguarde um instante e tente novamente.', 'warning');
+            setStatus('A câmera ainda está inicializando. Aguarde um instante.', 'warning');
+            burstFeito = false;        // câmera fria não conta: rearma a auto-captura
+            inicioQualidadeOk = null;
+            iniciarGuias();
             return;
         }
 
@@ -628,14 +698,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         brightness /= canvas.width * canvas.height;
         if (brightness < 80) {
-            setStatus('A foto está escura. Procure um local mais iluminado.', 'warning');
-            autoCapturaDisparada = false;
+            falharTentativa('A foto ficou escura. Ajuste a iluminação e toque em "Tentar novamente".');
             inicioQualidadeOk = null;
             return;
         }
         if (brightness > 225) {
-            setStatus('Há luz demais no rosto. Evite contraluz ou claridade direta.', 'warning');
-            autoCapturaDisparada = false;
+            falharTentativa('Luz demais no rosto. Evite contraluz e toque em "Tentar novamente".');
             inicioQualidadeOk = null;
             return;
         }
@@ -643,33 +711,29 @@ document.addEventListener('DOMContentLoaded', function() {
         // Converter para blob (JPEG alta qualidade) e mostrar preview
         canvas.toBlob(blob => {
             if (!blob) {
-                setStatus('Falha ao processar a foto. Tente novamente.', 'danger');
-                autoCapturaDisparada = false;
+                falharTentativa('Falha ao processar a foto. Toque em "Tentar novamente".', 'danger');
                 inicioQualidadeOk = null;
                 return;
             }
             blobCapturado = blob;
             const url = URL.createObjectURL(blob);
             previewImg.src = url;
-            
-            // (blob guardado em blobCapturado; o sessionStorage não guardava a imagem)
 
-            // Mostrar preview
+            // Mostrar preview (a detecção já está pausada durante o disparo)
             video.style.display = 'none';
-            captureBtn.style.display = 'none';
             preview.style.display = 'block';
         }, 'image/jpeg', 0.95);
     }
 
-    // Tirar novamente
+    // Tirar novamente: usuário pediu outra foto — permite um novo burst único
     retakeBtn.addEventListener('click', function() {
         blobCapturado = null;
         preview.style.display = 'none';
         video.style.display = 'block';
-        captureBtn.style.display = 'block';
-        captureBtn.disabled = false;
-        autoCapturaDisparada = false;   // reativa a auto-captura para a próxima foto
+        burstFeito = false;
         inicioQualidadeOk = null;
+        btnTentarNovamente.classList.add('d-none');
+        iniciarGuias();
     });
 
     // Confirmar e continuar
