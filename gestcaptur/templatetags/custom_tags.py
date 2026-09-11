@@ -24,3 +24,11 @@ def count_eventos_hibridos(user):
         coordenador=user,
         coordenador_tambem_fotografo=True
     ).count()
+
+
+@register.filter
+def has_group(user, group_name):
+    """Verifica se o usuário pertence a um grupo específico"""
+    if not user or not group_name:
+        return False
+    return user.groups.filter(name=group_name).exists()

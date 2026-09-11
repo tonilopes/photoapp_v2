@@ -10,9 +10,11 @@
             <h2><i class="bi bi-handshake"></i> Gerenciar Parceiros</h2>
             <p class="text-muted small mb-0">Parceiros têm acesso apenas de leitura ao painel de formandos</p>
         </div>
+        {% if perms.gestcaptur.pode_criar_parceiro %}
         <a href="{% url 'criar_parceiro' %}" class="btn btn-primary">
             <i class="bi bi-person-plus"></i> Novo Parceiro
         </a>
+        {% endif %}
     </div>
 
     {% if messages %}
@@ -85,9 +87,11 @@
             <div class="p-5 text-center text-muted">
                 <i class="bi bi-inbox" style="font-size: 2rem;"></i>
                 <p class="mt-3 mb-0">Nenhum parceiro criado ainda.</p>
+                {% if perms.gestcaptur.pode_criar_parceiro %}
                 <a href="{% url 'criar_parceiro' %}" class="btn btn-primary mt-3">
                     <i class="bi bi-person-plus"></i> Criar Primeiro Parceiro
                 </a>
+                {% endif %}
             </div>
             {% endif %}
         </div>
