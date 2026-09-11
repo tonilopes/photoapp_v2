@@ -58,6 +58,7 @@ class Usuario(AbstractUser):
             ('gerenciar_roles', 'Pode gerenciar roles e permissões (menu Usuários)'),
             ('ver_botao_compartilhar_formandos', 'Pode ver o botão Compartilhar Link/QRCode (painel de formandos)'),
             ('ver_botao_parceiros_formandos', 'Pode ver o botão Parceiros (painel de formandos)'),
+            ('pode_criar_parceiro', 'Pode criar novos parceiros'),
         )
 
     def __str__(self):

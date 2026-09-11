@@ -81,7 +81,7 @@ class RoleForm(forms.ModelForm):
             content_type=content_type_usuario,
             codename__in=[
                 'add_usuario', 'change_usuario', 'delete_usuario', 'view_usuario',
-                'gerenciar_roles',
+                'gerenciar_roles', 'pode_criar_parceiro',
             ]
         ).order_by('name')
         self.fields['permissoes_botoes_formandos'].queryset = Permission.objects.filter(
@@ -104,7 +104,7 @@ class RoleForm(forms.ModelForm):
             self.fields['permissoes_usuarios'].initial = self.instance.permissions.filter(
                 content_type=content_type_usuario, codename__in=[
                     'add_usuario', 'change_usuario', 'delete_usuario', 'view_usuario',
-                    'gerenciar_roles',
+                    'gerenciar_roles', 'pode_criar_parceiro',
                 ]
             )
             self.fields['permissoes_botoes_formandos'].initial = self.instance.permissions.filter(

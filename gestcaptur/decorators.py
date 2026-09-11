@@ -174,3 +174,34 @@ def evento_permission_required(permission_codename, login_url='login'):
             return redirect('dashboard')
         return wrapped_view
     return decorator
+
+
+def permissions_required(permission_codenames, login_url='login', redirect_url='dashboard'):
+    """
+    Decorator que verifica se o usuário tem pelo menos uma das permissões especificadas.
+    Útil para permitir acesso via múltiplas permissões diferentes.
+    
+    Exemplo:
+        @permissions_required(['gestcaptur.pode_criar_parceiro', 'gestcaptur.gerenciar_roles'])
+    """
+    if not isinstance(permission_codenames, (list, tuple)):
+        permission_codenames = [permission_codenames]
+    
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped_view(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect(f'{login_url}?next={request.get_full_path()}')
+            
+            # Verificar se é superuser ou tem pelo menos uma das permissões
+            if request.user.is_superuser:
+                return view_func(request, *args, **kwargs)
+            
+            for perm in permission_codenames:
+                if request.user.has_perm(perm):
+                    return view_func(request, *args, **kwargs)
+            
+            messages.error(request, 'Você não possui permissão para executar esta ação.')
+            return redirect(redirect_url)
+        return wrapped_view
+    return decorator

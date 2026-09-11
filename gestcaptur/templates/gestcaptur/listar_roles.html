@@ -34,6 +34,11 @@
                                 {% empty %}
                                     <span class="text-muted">Nenhuma</span>
                                 {% endfor %}
+                                {% for permissao in role.permissions.all %}
+                                    {% if permissao.content_type.app_label == 'gestcaptur' and permissao.content_type.model == 'usuario' %}
+                                        <span class="badge bg-info me-1" title="{{ permissao.content_type.model }}">{{ permissao.name }}</span>
+                                    {% endif %}
+                                {% endfor %}
                             </td>
                             <td class="text-end">
                                 <a href="{% url 'editar_role' role.id %}" class="btn btn-sm btn-outline-primary" title="Editar role">

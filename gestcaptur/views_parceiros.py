@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
 from .models import Usuario, Evento
-from .decorators import group_required
+from .decorators import group_required, permissions_required
 from django import forms
 
 
@@ -78,11 +78,24 @@ def listar_parceiros(request):
 
 
 @login_required
-@group_required('Gestor')
 def criar_parceiro(request):
     """
     Cria um novo usuário com role 'parceiro'
+    Acesso permitido para: 
+    - Gestor (grupo Django 'Gestor') 
+    - OU usuários com permissão 'pode_criar_parceiro' do modelo Usuario
     """
+    # Verificar permissão usando o decorator de permissions
+    from .decorators import permissions_required
+    
+    # Se não for Gestor e não tiver a permissão, redirecionar
+    user_groups = [g.name for g in request.user.groups.all()]
+    has_gestor_group = 'Gestor' in user_groups
+    
+    if not has_gestor_group and not request.user.has_perm('gestcaptur.pode_criar_parceiro'):
+        messages.error(request, 'Você não tem permissão para criar parceiros.')
+        return redirect('dashboard')
+    
     if request.method == 'POST':
         form = FormularioParceiro(request.POST)
         if form.is_valid():
