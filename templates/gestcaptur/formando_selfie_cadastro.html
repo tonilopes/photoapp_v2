@@ -42,6 +42,7 @@
                             <li>✅ Você precisará de uma <strong>câmera web ou câmera do celular</strong></li>
                             <li>✅ A <strong>selfie é obrigatória</strong> para validação de identidade</li>
                             <li>✅ Iluminação clara e rosto bem visível para melhor resultado</li>
+                            <li>↔️ <strong>Mantenha distância (~um braço):</strong> afaste o rosto até ele caber todo dentro do oval menor — de perto distorce</li>
                             <li>✅ Após capturar a selfie, preencha <strong>todos os campos obrigatórios</strong></li>
                             <li>✅ Após finalizar, você receberá confirmação de cadastro</li>
                         </ul>
@@ -88,7 +89,8 @@
             <div class="modal-body text-center p-4">
                 <div class="camera-frame" id="cameraFrame">
                     <video id="video" autoplay playsinline></video>
-                    <div class="face-guide" aria-hidden="true"></div>
+                    <div class="face-guide" id="faceGuide" aria-hidden="true"></div>
+                    <div class="face-guide-hint" aria-hidden="true">↔️ Afaste o rosto até caber no oval</div>
                     <div class="countdown-overlay" id="countdownOverlay" aria-hidden="true"><span id="countdownNumber">3</span></div>
                     <div class="flash-overlay" id="flashOverlay" aria-hidden="true"></div>
                 </div>
@@ -198,9 +200,32 @@
 
 .face-guide {
     position: absolute;
-    inset: 12% 15%;
-    border: 3px solid rgba(255, 255, 255, .85);
-    border-radius: 48% 48% 42% 42%;
+    /* Oval MENOR: força o rosto a ficar mais longe (~50-60cm) evitando
+       distorção de grande-angular. Largura ~44% e altura ~48% do frame. */
+    inset: 26% 28%;
+    border: 3px solid rgba(255, 255, 255, .9);
+    border-radius: 50% 50% 46% 46% / 58% 58% 42% 42%;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, .45);
+    pointer-events: none;
+    transition: border-color .25s ease, box-shadow .25s ease;
+}
+
+.face-guide.ok {
+    border-color: #28a745;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, .30), 0 0 18px rgba(40, 167, 69, .8);
+}
+
+.face-guide-hint {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 6%;
+    width: 90%;
+    text-align: center;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-shadow: 0 1px 6px rgba(0,0,0,.7);
     pointer-events: none;
 }
 
@@ -410,9 +435,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const larguraRosto = (maxX - minX) * video.videoWidth;
             const centerX = ((minX + maxX) / 2) * video.videoWidth;
             const centerY = ((minY + maxY) / 2) * video.videoHeight;
-            const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * .18 &&
-                Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * .22;
-            const correctSize = larguraRosto > video.videoWidth * .22 && larguraRosto < video.videoWidth * .82;
+            const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * .15 &&
+                Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * .18;
+            // FAIXA IDEAL MENOR: oval reduzido (~44% largura) -> rosto precisa ficar
+            // mais LONGE (~50-60cm) para caber, evitando distorção grande-angular.
+            // Mantém qualidade: captura continua em alta resolução (1920px).
+            const FACE_MIN = 0.28, FACE_MAX = 0.55;
+            const correctSize = larguraRosto > video.videoWidth * FACE_MIN && larguraRosto < video.videoWidth * FACE_MAX;
+            // Feedback visual do oval (verde quando OK)
+            const faceGuideEl = document.getElementById('faceGuide');
+            if (faceGuideEl) faceGuideEl.classList.toggle('ok', centered && correctSize);
             // Pose: nariz (ponto 1) deslocado do meio dos olhos (33, 263) = rosto de lado
             const olhoE = pontos[33], olhoD = pontos[263], nariz = pontos[1];
             const distOlhos = Math.hypot(olhoD.x - olhoE.x, olhoD.y - olhoE.y) || 1e-6;
@@ -421,9 +453,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const proporcaoPerfil = distOlhos / larguraRostoNorm;   // baixa = vista de lado (olhos encurtados)
             const dePerfil = desvioNariz > 0.12 || proporcaoPerfil < 0.22;
             if (!centered) {
-                setStatus('Centralize seu rosto dentro do contorno.', 'warning');
+                setStatus('Centralize seu rosto dentro do oval menor.', 'warning');
             } else if (!correctSize) {
-                setStatus(larguraRosto < video.videoWidth * .22 ? 'Aproxime um pouco o rosto.' : 'Afaste um pouco o rosto.', 'warning');
+                setStatus(larguraRosto < video.videoWidth * FACE_MIN ? '↔️ Afaste o rosto: deixe-o menor, cabendo todo dentro do oval.' : '⚠️ Muito perto! Afaste bem o rosto até caber todo dentro do oval.', 'warning');
             } else if (dePerfil) {
                 setStatus('Vire o rosto de frente para a câmera, sem ficar de perfil.', 'warning');
             } else {

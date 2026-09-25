@@ -214,18 +214,7 @@
     }
 
     #camera-area {
-        /* Manter propor\u00e7\u00e3o 3:4 (portrait) */
-        aspect-ratio: 3 / 4;
-        width: 100%;
-        max-width: 450px;
-        max-height: 600px;
-        background: #000;
-        border-radius: 8px;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    #camera-area {
+        position: relative;
         /* Manter proporção 3:4 (portrait) */
         aspect-ratio: 3 / 4 !important;
         width: 100% !important;
@@ -238,6 +227,37 @@
         align-items: center !important;
         justify-content: center !important;
         margin-bottom: 20px !important;
+    }
+
+    /* Oval de enquadramento MENOR: força rosto mais longe (~50-60cm),
+       evitando distorção grande-angular. Sem perda de qualidade
+       (captura continua em 900x1200). */
+    #camera-area .selfie-oval {
+        position: absolute;
+        inset: 26% 28%;
+        border: 3px solid rgba(255, 255, 255, .9);
+        border-radius: 50% 50% 46% 46% / 58% 58% 42% 42%;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, .45);
+        pointer-events: none;
+        z-index: 5;
+    }
+    #camera-area .selfie-oval.ok {
+        border-color: #28a745;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, .30), 0 0 18px rgba(40,167,69,.8);
+    }
+    #camera-area .selfie-oval-hint {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 6%;
+        width: 90%;
+        text-align: center;
+        color: #fff;
+        font-size: 13px;
+        font-weight: 600;
+        text-shadow: 0 1px 6px rgba(0,0,0,.7);
+        pointer-events: none;
+        z-index: 6;
     }
 
     #camera-area video,
@@ -296,6 +316,7 @@
             <ul>
                 <li>📷 <strong>Boa iluminação:</strong> Use iluminação frontal, evite sombras no rosto</li>
                 <li>😊 <strong>Rosto centralizado:</strong> Posicione seu rosto no centro da câmera</li>
+                <li>↔️ <strong>Mantenha distância (~um braço):</strong> afaste o rosto até caber todo dentro do oval menor — de perto distorce</li>
                 <li>👀 <strong>Olhe para a câmera:</strong> Mantenha contato visual direto</li>
                 <li>🚫 <strong>Sem óculos de sol:</strong> O rosto deve ser claramente visível</li>
                 <li>⚠️ <strong>Qualidade mínima:</strong> A câmera será ajustada automaticamente</li>

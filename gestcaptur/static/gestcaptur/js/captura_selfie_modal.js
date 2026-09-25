@@ -176,6 +176,11 @@ document.addEventListener('DOMContentLoaded', function() {
   function atualizarStatus(mensagem, falar = true) {
     if (cameraStatus) cameraStatus.textContent = mensagem;
     if (falar) falarAviso(mensagem.replace(/[📷✅⚠️❌]/g, '').trim());
+    // Sincroniza cor do oval com validade do enquadramento
+    try {
+      const oval = document.getElementById('selfie-oval');
+      if (oval) oval.classList.toggle('ok', faceGuidance.valid === true);
+    } catch (e) {}
   }
 
   function orientarEnquadramento(video) {
@@ -192,14 +197,17 @@ document.addEventListener('DOMContentLoaded', function() {
       const box = faces[0].boundingBox;
       const centerX = box.originX + box.width / 2;
       const centerY = box.originY + box.height / 2;
-      const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * 0.18 &&
-        Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * 0.22;
-      const goodSize = box.width > video.videoWidth * 0.22 && box.width < video.videoWidth * 0.82;
+      const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * 0.15 &&
+        Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * 0.18;
+      // Oval MENOR: exige rosto mais longe (~50-60cm) para caber, evitando
+      // distorção grande-angular. Qualidade mantida (captura em alta resolução).
+      const FACE_MIN = 0.28, FACE_MAX = 0.55;
+      const goodSize = box.width > video.videoWidth * FACE_MIN && box.width < video.videoWidth * FACE_MAX;
 
       if (!centered) {
-        atualizarStatus('Centralize o rosto no oval da tela.');
+        atualizarStatus('Centralize o rosto no oval menor da tela.');
       } else if (!goodSize) {
-        atualizarStatus(box.width < video.videoWidth * 0.22 ? 'Aproxime um pouco o rosto.' : 'Afaste um pouco o rosto.');
+        atualizarStatus(box.width < video.videoWidth * FACE_MIN ? 'Afaste o rosto até caber todo dentro do oval.' : 'Muito perto! Afaste bem o rosto até caber no oval.');
       } else {
         const agora = performance.now();
         if (agora - ultimaAvaliacaoQualidade > 350) {
@@ -340,6 +348,19 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     cameraArea.appendChild(video);
+    // Oval de enquadramento MENOR (visual): guia o formando a manter distância
+    if (!cameraArea.querySelector('.selfie-oval')) {
+      const oval = document.createElement('div');
+      oval.className = 'selfie-oval';
+      oval.id = 'selfie-oval';
+      oval.setAttribute('aria-hidden', 'true');
+      cameraArea.appendChild(oval);
+      const hint = document.createElement('div');
+      hint.className = 'selfie-oval-hint';
+      hint.textContent = '↔️ Afaste o rosto até caber no oval';
+      hint.setAttribute('aria-hidden', 'true');
+      cameraArea.appendChild(hint);
+    }
     console.log('✅ <video id="selfie-video"> criado e adicionado ao DOM');
 
     // Etapa 4: Atualizar status
