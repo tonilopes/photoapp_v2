@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager, Group
 from django.utils import timezone
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
+import os
 import uuid
 import unicodedata
 import re
@@ -210,6 +211,94 @@ class Evento(models.Model):
             return total_por_sessao
         return self.alunos.exclude(foto='').exclude(foto__isnull=True).count()
 
+# ============================================================
+# HOTFIX salvamento (25/09/2026) - Caminho da foto do aluno
+# Corrige o erro exibido ao salvar a selfie do formando:
+#   "Erro ao salvar cadastro: Storage can not find an available filename
+#    for 'event_photos/<codigo_turma>/<NOME>.JPG' ... Please make sure that
+#    the corresponding file field allows sufficient max_length"
+# Causa: o caminho 'event_photos/{codigo_turma}/{NOME}.JPG' passava do
+# max_length=100 (padrão do ImageField) porque codigo_turma aceita até 100
+# caracteres. O Django, em Storage.get_available_name(), não conseguia
+# encurtar o nome e abortava com SuspiciousFileOperation.
+# Solucao: upload_to que sanitiza e limita o caminho + max_length=255.
+# Reversao: upload_to='event_photos/', remover max_length do campo e voltar
+#           Aluno.get_nome_arquivo_foto() a retornar f"{pasta}/{nome_arquivo}".
+# ============================================================
+FOTO_ALUNO_PREFIXO = 'event_photos/'
+FOTO_ALUNO_MAX_LENGTH = 255         # deve acompanhar Aluno.foto.max_length
+FOTO_ALUNO_MIN_NOME = 15            # mínimo reservado para o nome do arquivo
+FOTO_ALUNO_MIN_PASTA = 12           # mínimo reservado para a pasta da turma
+FOTO_ALUNO_RESERVA_COLISAO = 9      # reserva p/ o sufixo '_XXXXXXX' do Django
+
+
+def normalizar_segmento_foto(valor, limite=None):
+    """Sanitiza um trecho (pasta ou nome de arquivo) para uso seguro no caminho."""
+    if valor is None:
+        return ''
+    texto = str(valor).replace('\\', '/')
+    # Remove caracteres inválidos em nomes de arquivo/pasta (Windows e Linux)
+    texto = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', texto)
+    # Espaços/quebras de linha repetidos viram um único espaço
+    texto = re.sub(r'\s+', ' ', texto).strip(' .')
+    if limite and limite > 0 and len(texto) > limite:
+        texto = texto[:limite].strip(' .-_')
+    return texto
+
+
+def montar_caminho_foto(pasta, nome_arquivo, max_length=FOTO_ALUNO_MAX_LENGTH):
+    """
+    Monta 'pasta/NOME.EXT' sanitizado e com tamanho total seguro.
+
+    O caminho final (com o prefixo 'event_photos/') fica sempre abaixo do
+    max_length do campo, mantendo reserva para o sufixo '_XXXXXXX' que o Django
+    adiciona quando já existe um arquivo com o mesmo nome. O nome do formando
+    é preservado; a pasta da turma é a primeira a ser encurtada.
+    Reversao: return f"{pasta}/{nome_arquivo}"
+    """
+    pasta = normalizar_segmento_foto(pasta) or 'sem_turma'
+    nome_arquivo = normalizar_segmento_foto(nome_arquivo) or 'FOTO.JPG'
+
+    base, ext = os.path.splitext(nome_arquivo)
+    if not ext:
+        ext = '.JPG'
+    ext = ext[:6]
+    base = normalizar_segmento_foto(base) or 'FOTO'
+
+    # Orçamento de caracteres para 'pasta/nome' (sem contar o prefixo do upload_to)
+    orcamento = max_length - len(FOTO_ALUNO_PREFIXO) - FOTO_ALUNO_RESERVA_COLISAO - len(ext) - 1
+    orcamento = max(orcamento, FOTO_ALUNO_MIN_NOME + FOTO_ALUNO_MIN_PASTA + 1)
+
+    if len(pasta) + 1 + len(base) > orcamento:
+        # 1) Encurta a pasta (prioriza preservar o nome completo do formando)
+        sobra_pasta = orcamento - len(base) - 1
+        if sobra_pasta < FOTO_ALUNO_MIN_PASTA:
+            # 2) Pasta já no mínimo -> encurta o nome do arquivo
+            sobra_pasta = FOTO_ALUNO_MIN_PASTA
+            base = base[:max(orcamento - sobra_pasta - 1, 1)].strip(' .-_') or 'FOTO'
+        pasta = pasta[:sobra_pasta].strip(' .-_') or 'sem_turma'
+
+    return f"{pasta}/{base}{ext}"
+
+
+def caminho_foto_aluno(instance, filename):
+    """
+    upload_to do campo Aluno.foto.
+
+    Recebe o nome sugerido (ex.: 'selfie_12_ab12cd34.jpg' ou
+    'CODIGO_TURMA/NOME.JPG') e devolve o caminho final já sanitizado, limitado
+    ao max_length do campo e sem duplicar o prefixo 'event_photos/'.
+    """
+    nome = str(filename or '').replace('\\', '/')
+    if nome.startswith(FOTO_ALUNO_PREFIXO):
+        nome = nome[len(FOTO_ALUNO_PREFIXO):]
+    if '/' in nome:
+        pasta, _, arquivo = nome.rpartition('/')
+    else:
+        pasta, arquivo = '', nome
+    return FOTO_ALUNO_PREFIXO + montar_caminho_foto(pasta, arquivo)
+
+
 class Aluno(models.Model):
     evento = models.ForeignKey(Evento, on_delete=models.CASCADE, related_name='alunos')
     nome = models.CharField(max_length=200) # sempre obrigatório
@@ -241,7 +330,14 @@ class Aluno(models.Model):
     whatsapp_parente = models.CharField(max_length=20, blank=True, null=True)
     token = models.CharField(max_length=100, unique=True, blank=True, null=True)
     ident = models.BooleanField(default=False)
-    foto = models.ImageField(upload_to='event_photos/', blank=True, null=True)
+    # HOTFIX salvamento (25/09/2026): max_length 255 + upload_to sanitizado
+    # (ver caminho_foto_aluno). Reversao: upload_to='event_photos/' sem max_length.
+    foto = models.ImageField(
+        upload_to=caminho_foto_aluno,
+        max_length=FOTO_ALUNO_MAX_LENGTH,
+        blank=True,
+        null=True
+    )
     photographer = models.ForeignKey(
         'Usuario',
         on_delete=models.SET_NULL,
@@ -311,8 +407,9 @@ class Aluno(models.Model):
         # Exemplo: "ADRIANO MURAD DE ALCANTARA.JPG"
         nome_arquivo = f"{self.nome.strip().upper()}.JPG"
         
-        # Retornar caminho: pasta/NOME COMPLETO.JPG
-        return f"{pasta}/{nome_arquivo}"
+        # HOTFIX salvamento (25/09/2026): sanitiza e limita o caminho ao
+        # max_length do campo. Reversao: return f"{pasta}/{nome_arquivo}"
+        return montar_caminho_foto(pasta, nome_arquivo)
     
     def save(self, *args, **kwargs):
         # Transformar nome para MAIÚSCULAS (caixa alta) para padronização

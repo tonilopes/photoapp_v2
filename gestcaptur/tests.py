@@ -1,14 +1,17 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils.text import get_valid_filename
 
 import io
 import os
+import tempfile
 from PIL import Image
 
-from gestcaptur.models import Evento
+from gestcaptur.models import Evento, Aluno, caminho_foto_aluno
 from gestcaptur.utils.imagens import processar_selfie
 
 Usuario = get_user_model()
@@ -186,4 +189,173 @@ class PipelineImagemSelfieTests(TestCase):
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+
+
+class CaminhoFotoAlunoTests(TestCase):
+    """
+    Regressão do erro exibido em produção em 25/09/2026 (fluxo do formando):
+
+      "Erro ao salvar cadastro: Storage can not find an available filename for
+       event_photos/26155 25-09-2026 Superior Diversos - FATEC Americana 2026.1
+       Prime Colação Oficial/ALEXANDERSON_DE_SOUZA_MODES..." Please make sure
+       that the corresponding file field allows sufficient "max_length".
+
+    O codigo_turma do evento é usado como pasta da foto e aceita até 100
+    caracteres; somado ao prefixo 'event_photos/' e ao nome do formando, o
+    caminho ultrapassava o max_length=100 do ImageField e o Django abortava o
+    salvamento com SuspiciousFileOperation (a selfie nunca era gravada).
+    """
+
+    CODIGO_TURMA_LONGO = (
+        '26155 25-09-2026 Superior Diversos - FATEC Americana 2026.1 '
+        'Prime Colação Oficial'
+    )
+
+    def setUp(self):
+        self.evento = Evento.objects.create(
+            fot='TESTE-003',
+            data='2026-09-25',
+            para_selfie=True,
+            uuid='cccccccc-1111-2222-3333-444444444444',
+            codigo_turma=self.CODIGO_TURMA_LONGO,
+        )
+
+    def _jpeg_bytes(self, largura=40, altura=40):
+        img = Image.new('RGB', (largura, altura), (200, 200, 200))
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=85)
+        return buf.getvalue()
+
+    def _aluno(self, nome='ALEXANDERSON DE SOUZA MODESTO'):
+        return Aluno(
+            evento=self.evento,
+            nome=nome,
+            cpf='123.456.789-00',
+            whatsapp='17999990000',
+            codigo_turma=self.evento.codigo_turma,
+        )
+
+    def test_salva_selfie_com_codigo_turma_longo(self):
+        """Antes do hotfix: SuspiciousFileOperation. Depois: grava normalmente."""
+        aluno = self._aluno()
+        max_length = Aluno._meta.get_field('foto').max_length
+        self.assertGreaterEqual(max_length, 200)
+
+        with tempfile.TemporaryDirectory() as media_root, \
+                override_settings(MEDIA_ROOT=media_root):
+            # Exatamente como views_formandos._processar_cadastro faz
+            caminho_sugerido = aluno.get_nome_arquivo_foto()
+            self.assertIn('ALEXANDERSON DE SOUZA MODESTO.JPG', caminho_sugerido)
+            self.assertLessEqual(
+                len('event_photos/' + caminho_sugerido),
+                max_length,
+            )
+
+            aluno.foto.save(
+                caminho_sugerido,
+                ContentFile(self._jpeg_bytes()),
+                save=False,
+            )
+
+            # O Django aplica get_valid_filename() no nome do arquivo
+            # (espaços -> '_'), o que gerava "ALEXANDERSON_DE_SOUZA_MODES1..."
+            self.assertTrue(aluno.foto.name.startswith('event_photos/'))
+            self.assertTrue(
+                aluno.foto.name.endswith(
+                    get_valid_filename('ALEXANDERSON DE SOUZA MODESTO.JPG')
+                )
+            )
+            self.assertLessEqual(len(aluno.foto.name), max_length)
+            self.assertLessEqual(len(aluno.foto.name), 255)
+            self.assertTrue(os.path.exists(os.path.join(media_root, aluno.foto.name)))
+
+            # A pasta da turma é preservada como o gestor definiu
+            self.assertIn('Prime Colação Oficial', aluno.foto.name)
+
+            # Persistência completa (como em views_formandos._processar_cadastro)
+            aluno.save()
+            aluno.refresh_from_db()
+            self.assertLessEqual(len(aluno.foto.name), max_length)
+            self.assertIn('Prime Colação Oficial', aluno.foto.name)
+
+    def test_segundo_evento_real_tambem_salva(self):
+        """
+        Caso real 2 (print de 26-09-2026):
+          event_photos/26205 26-09-2026 Superior Diversos Insper 26.1 Unific.
+          Insper 2026.1 Toy SP Family Day/JOAO_RICARDO_qd4lqzP.JPG
+
+        Pasta de 86 chars + 'JOÃO RICARDO': 13 + 86 + 1 + 11 + 4 = 115 > 100
+        (max_length antigo do campo) -> SuspiciousFileOperation.
+        """
+        self.evento.codigo_turma = (
+            '26205 26-09-2026 Superior Diversos Insper 26.1 Unific. '
+            'Insper 2026.1 Toy SP Family Day'
+        )
+        self.evento.save(update_fields=['codigo_turma'])
+
+        aluno = self._aluno(nome='JOÃO RICARDO')
+        caminho = 'event_photos/' + aluno.get_nome_arquivo_foto()
+
+        # É exatamente por isso que quebrava antes (max_length era 100)
+        self.assertGreater(len(caminho), 100)
+        self.assertLessEqual(
+            len(caminho), Aluno._meta.get_field('foto').max_length
+        )
+
+        with tempfile.TemporaryDirectory() as media_root, \
+                override_settings(MEDIA_ROOT=media_root):
+            aluno.foto.save(
+                aluno.get_nome_arquivo_foto(),
+                ContentFile(self._jpeg_bytes()),
+                save=False,
+            )
+
+            self.assertLessEqual(len(aluno.foto.name), 255)
+            self.assertIn('Toy SP Family Day', aluno.foto.name)
+            self.assertTrue(
+                aluno.foto.name.endswith(
+                    get_valid_filename('JOÃO RICARDO.JPG')
+                )
+            )
+            self.assertTrue(os.path.exists(os.path.join(media_root, aluno.foto.name)))
+
+    def test_reatribuicao_de_foto_no_save_usa_caminho_seguro(self):
+        """
+        Fluxo público/obrigatória: a foto é atribuída ao campo e o override de
+        Aluno.save() renomeia para '{codigo_turma}/{NOME}.JPG' — o caminho
+        precisa continuar dentro do max_length.
+        """
+        max_length = Aluno._meta.get_field('foto').max_length
+
+        with tempfile.TemporaryDirectory() as media_root, \
+                override_settings(MEDIA_ROOT=media_root):
+            aluno = self._aluno()
+            aluno.foto = ContentFile(
+                self._jpeg_bytes(), name='selfie_1_deadbeef.jpg'
+            )
+            aluno.save()
+
+            self.assertLessEqual(len(aluno.foto.name), max_length)
+            self.assertIn('ALEXANDERSON', aluno.foto.name.upper())
+            self.assertTrue(os.path.exists(os.path.join(media_root, aluno.foto.name)))
+
+    def test_caminho_nunca_excede_max_length(self):
+        """Pasta longa (100) + nome longo (200) seguem abaixo do max_length."""
+        aluno = self._aluno(nome='NOME DE FORMANDO MUITO LONGO ' * 8)
+        max_length = Aluno._meta.get_field('foto').max_length
+        caminho = caminho_foto_aluno(aluno, aluno.get_nome_arquivo_foto())
+        self.assertLessEqual(len(caminho), max_length)
+        self.assertTrue(caminho.startswith('event_photos/'))
+
+        # Nome já prefixado não deve duplicar o prefixo
+        caminho_prefixado = caminho_foto_aluno(aluno, 'event_photos/x/y.jpg')
+        self.assertEqual(caminho_prefixado.count('event_photos/'), 1)
+
+    def test_nome_com_caracteres_invalidos_e_sanitizado(self):
+        aluno = self._aluno(nome='JOSE/DA SILVA:TESTE*')
+        caminho = caminho_foto_aluno(aluno, aluno.get_nome_arquivo_foto())
+        arquivo = os.path.basename(caminho)
+        for caractere in ('/', '\\', ':', '*', '?', '"', '<', '>', '|'):
+            self.assertNotIn(caractere, arquivo)
+        self.assertLessEqual(len(caminho), Aluno._meta.get_field('foto').max_length)
 
