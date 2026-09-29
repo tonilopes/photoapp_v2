@@ -289,6 +289,45 @@
             max-height: 60vh;
         }
     }
+
+    /* HOTFIX salvamento (25/09/2026): o overlay "Analisando" estava no .modal-body com
+       position:absolute/inset:0 e, como .modal-content e o ancestral posicionado, ele
+       cobria TAMBEM os botoes do rodape -> aluno nao conseguia clicar em Confirmar.
+       Agora ele fica preso ao wrapper #selfie-stage (camera + status).
+       Reversao: apagar daqui ate o fim do bloco @keyframes giraAnalise. */
+    #selfie-stage {
+        position: relative;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+    #analiseOverlay {
+        display: none;
+        position: absolute;
+        inset: 0;
+        background: rgba(10, 12, 20, .92);
+        z-index: 30;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        border-radius: 12px;
+        text-align: center;
+        padding: 20px;
+    }
+    .spinner-analise {
+        width: 3rem;
+        height: 3rem;
+        border: .4rem solid rgba(255, 255, 255, .25);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: giraAnalise .9s linear infinite;
+    }
+    @keyframes giraAnalise {
+        to { transform: rotate(360deg); }
+    }
 </style>
 {% endblock %}
 
@@ -317,6 +356,9 @@
                 <li>📷 <strong>Boa iluminação:</strong> Use iluminação frontal, evite sombras no rosto</li>
                 <li>😊 <strong>Rosto centralizado:</strong> Posicione seu rosto no centro da câmera</li>
                 <li>↔️ <strong>Mantenha distância (~um braço):</strong> afaste o rosto até caber todo dentro do oval menor — de perto distorce</li>
+                <!-- NOVO anti-careta: orientacao (reversivel: apagar estas 2 linhas) -->
+                <li>😐 <strong>Expressão neutra:</strong> olhe para a câmera, sem caretas, sem revirar/estrabicar os olhos, boca fechada</li>
+                <li>👤 <strong>Sozinho no quadro:</strong> nenhuma outra pessoa pode aparecer junto</li>
                 <li>👀 <strong>Olhe para a câmera:</strong> Mantenha contato visual direto</li>
                 <li>🚫 <strong>Sem óculos de sol:</strong> O rosto deve ser claramente visível</li>
                 <li>⚠️ <strong>Qualidade mínima:</strong> A câmera será ajustada automaticamente</li>
@@ -342,14 +384,24 @@
             </div>
 
             <div class="modal-body" style="padding: 20px; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1;">
-                <!-- Área da câmera -->
-                <div id="camera-area" style="width: 100%; max-width: 450px; margin-bottom: 20px;">
-                    <!-- Será preenchido pelo JS -->
-                </div>
+                <!-- HOTFIX salvamento: #selfie-stage isola o overlay "Analisando" da area dos
+                     botoes do rodape (reversao: apagar o wrapper e deixar camera-area/status soltos) -->
+                <div id="selfie-stage">
+                    <!-- Área da câmera -->
+                    <div id="camera-area" style="width: 100%; max-width: 450px; margin-bottom: 20px;">
+                        <!-- Será preenchido pelo JS -->
+                    </div>
 
-                <!-- Instruções em tempo real -->
-                <div id="camera-status" role="status" aria-live="polite" style="font-size: clamp(14px, 4vw, 16px); text-align: center; margin-bottom: 20px; min-height: 30px;">
-                    📷 Inicializando câmera...
+                    <!-- Instruções em tempo real -->
+                    <div id="camera-status" role="status" aria-live="polite" style="font-size: clamp(14px, 4vw, 16px); text-align: center; margin-bottom: 20px; min-height: 30px;">
+                        📷 Inicializando câmera...
+                    </div>
+                    <!-- NOVO anti-careta: overlay Analisando (reversivel: apagar este bloco) -->
+                    <div id="analiseOverlay">
+                        <div class="spinner-analise"></div>
+                        <div style="color:#fff;font-weight:700;font-size:18px;">Analisando sua foto, um momento...</div>
+                        <div id="analiseDetalhe" style="color:rgba(255,255,255,.75);font-size:13px;">Validando rosto, expressao e qualidade</div>
+                    </div>
                 </div>
             </div>
 
@@ -370,5 +422,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- NOVO anti-careta: validacao isolada (reversivel: apagar esta linha) -->
+<script src="{% static 'gestcaptur/js/selfie_validacao.js' %}"></script>
 <script src="{% static 'gestcaptur/js/captura_selfie_modal.js' %}"></script>
 {% endblock %}

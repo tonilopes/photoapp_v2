@@ -5,134 +5,25 @@
 
 {% block extra_css %}
 <style>
-    html, body {
-        width: 100%;
-        height: auto;
-        overflow: auto;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    }
-    video {
-        display: none !important;
-        visibility: hidden !important;
-        position: absolute;
-        top: -9999px;
-        left: -9999px;
-    }
-    #camera-area video, #camera-area img {
-        display: block !important;
-        visibility: visible !important;
-        position: relative;
-        top: auto;
-        left: auto;
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover !important;
-    }
-    .selfie-wrapper {
-        width: 100vw;
-        min-height: 100vh;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 20px;
-        color: white;
-    }
-    .selfie-content {
-        width: 100%;
-        max-width: 500px;
-        text-align: center;
-    }
-    .selfie-title h1 {
-        font-size: clamp(28px, 8vw, 36px);
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
-    .selfie-title p {
-        font-size: clamp(16px, 5vw, 20px);
-        opacity: 0.95;
-        margin-bottom:  ️20px;
-    }
-    .selfie-instructions {
-        background: rgba(255,255,255,0.15);
-        border-left: 4px solid #ffc107;
-        padding: 16px;
-        border-radius: 10px;
-        margin-bottom: 30px;
-        font-size: clamp(15px, 4.5vw, 17px);
-        line-height: 1.7;
-        backdrop-filter: blur(10px);
-    }
-    .selfie-instructions ul {
-        list-style: none;
-        padding:  ️0;
-        margin:  ️12px 0 0;
-        text-align: left;
-    }
-    .selfie-instructions li {
-        margin-bottom: 8px;
-    }
-    #camera-area {
-        aspect-ratio: 3 / 4;
-        width: 100%;
-        max-width: 450px;
-        max-height: 600px;
-        background: #000;
-        border-radius: 8px;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin:  ️0 auto 20px auto;
-    }
-    .btn-iniciar {
-        background: #ffc107;
-        color: #212529;
-        border: none;
-        padding: 16px 32px;
-        font-size: clamp(18px, 5vw, 22px);
-        font-weight: 700;
-        border-radius: 50px;
-        cursor: pointer;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        transition: transform 0.2s;
-    }
-    .btn-iniciar:hover {
-        transform: scale(1.05);
-    }
-    .btn-confirmar {
-        background: #28a745;
-        color: white;
-        border: none;
-        padding:  ️14px 28px;
-        font-size: clamp(16px, 4.5vw, 20px);
-        font-weight: 700;
-        border-radius:  ️50px;
-        cursor: pointer;
-        margin-left:  ️10px;
-    }
-    #status-msg {
-        margin-top: 16px;
-        font-size: clamp(14px, 4vw, 16px);
-        min-height:  ️24px;
-    }
-    @media (max-width: 576px) {
-        .selfie-wrapper {
-            padding: 15px;
-            min-height: auto;
-        }
-        .selfie-instructions {
-            padding:  ️14px;
-            margin-bottom: 20px;
-        }
-        .btn-iniciar {
-            padding: 14px 24px;
-        }
-        #camera-area {
-            max-width: 100%;
-            max-height: 60vh;
-        }
+    html, body { width: 100%; height: auto; overflow: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+    video { display: none !important; visibility: hidden !important; position: absolute; top: -9999px; left: -9999px; }
+    #camera-area video, #camera-area img { display: block !important; visibility: visible !important; position: relative; top: auto; left: auto; width: 100% !important; height: 100% !important; object-fit: cover !important; }
+    .selfie-wrapper { width: 100vw; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; color: white; }
+    .selfie-content { width: 100%; max-width: 500px; text-align: center; }
+    .selfie-title h1 { font-size: clamp(28px, 8vw, 36px); font-weight: 700; margin-bottom: 8px; }
+    .selfie-title p { font-size: clamp(16px, 5vw, 20px); opacity: 0.95; margin-bottom: 20px; }
+    .selfie-instructions { background: rgba(255,255,255,0.15); border-left: 4px solid #ffc107; padding: 16px; border-radius: 10px; margin-bottom: 30px; font-size: clamp(15px, 4.5vw, 17px); line-height: 1.7; backdrop-filter: blur(10px); }
+    .selfie-instructions ul { list-style: none; padding: 0; margin: 12px 0 0; text-align: left; }
+    .selfie-instructions li { margin-bottom: 8px; }
+    #camera-area { aspect-ratio: 3 / 4; width: 100%; max-width: 450px; max-height: 600px; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; }
+    .btn-iniciar { background: #ffc107; color: #212529; border: none; padding: 16px 32px; font-size: clamp(18px, 5vw, 22px); font-weight: 700; border-radius: 50px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: transform 0.2s; }
+    .btn-iniciar:hover { transform: scale(1.05); }
+    .btn-confirmar { background: #28a745; color: white; border: none; padding: 14px 28px; font-size: clamp(16px, 4.5vw, 20px); font-weight: 700; border-radius: 50px; cursor: pointer; margin-left: 10px; }
+    #status-msg { margin-top: 16px; font-size: clamp(14px, 4vw, 16px); min-height: 24px; }
+    @media (max-width: 576px) { .selfie-wrapper { padding: 15px; min-height: auto; }
+        .selfie-instructions { padding: 14px; margin-bottom: 20px; }
+        .btn-iniciar { padding: 14px 24px; }
+        #camera-area { max-width: 100%; max-height: 60vh; }
     }
 </style>
 {% endblock %}
@@ -164,5 +55,17 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- [JS_SELFIE] -->
+<script>
+(function() { const alunoId = "{{ aluno_id }}"; const token = "{{ aluno_token }}"; const btnIniciar = document.getElementById('btn-iniciar'); const btnConfirmar = document.getElementById('btn-confirmar'); const cameraArea = document.getElementById('camera-area'); const statusMsg = document.getElementById('status-msg'); let stream = null; let imagemCapturada = null; function getCookie(name) { const match = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]*)')); return match ? match[2] : null; }
+
+    btnIniciar.addEventListener('click', async function() { // Se já há preview, permite recapturar
+        const preview = document.getElementById('foto-preview'); if (preview) preview.remove(); imagemCapturada = null; btnConfirmar.style.display = 'none'; try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false
+            }); const video = document.createElement('video'); video.id = 'video-selfie'; video.autoplay = true; video.playsInline = true; video.srcObject = stream; cameraArea.style.display = 'flex'; cameraArea.innerHTML = ''; cameraArea.appendChild(video); await video.play(); statusMsg.textContent = '📷 Posicione seu rosto e clique em "Confirmar"'; btnIniciar.textContent = '🔄 Recapturar'; setTimeout(() => { if (stream) btnConfirmar.style.display = 'inline-block'; }, 1500); } catch (err) { statusMsg.textContent = '⚠ Não foi possível acessar a câmera. Verifique as permissões.'; console.error(err); }
+    }); btnConfirmar.addEventListener('click', async function() { if (!stream) return; const video = document.getElementById('video-selfie'); const canvas = document.createElement('canvas'); canvas.width = video.videoWidth || 1280; canvas.height = video.videoHeight || 960; canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height); imagemCapturada = canvas.toDataURL('image/jpeg', 0.9); if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+        video.remove(); const img = document.createElement('img'); img.id = 'foto-preview'; img.src = imagemCapturada; cameraArea.innerHTML = ''; cameraArea.appendChild(img); btnConfirmar.style.display = 'none'; statusMsg.textContent = '⏳ Salvando imagem...'; const fd = new URLSearchParams(); fd.append('aluno_id', alunoId); fd.append('token', token); fd.append('image_data', imagemCapturada); try { const resp = await fetch("{% url 'salvar_selfie_obrigatoria' %}", { method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') || '' }, body: fd
+            }); const data = await resp.json(); if (data.success) { statusMsg.textContent = '✅ ' + (data.message || 'Selfie salva com sucesso!'); setTimeout(function() { window.location.href = data.redirect_url || "{% url 'aluno_cadastro_sucesso' %}"; }, 800); } else { statusMsg.textContent = '⚠ ' + (data.error || 'Erro ao salvar. Tente novamente.'); btnConfirmar.style.display = 'inline-block'; }
+        } catch (err) { statusMsg.textContent = '❌ Erro de rede ao salvar. Tente novamente.'; btnConfirmar.style.display = 'inline-block'; console.error(err); }
+    });
+})();
+</script>
 {% endblock %}
