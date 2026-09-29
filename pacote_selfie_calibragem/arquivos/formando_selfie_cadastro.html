@@ -892,15 +892,75 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fallback manual: v3.2 o botao fica SEMPRE visivel (nao espera o detector
     // falhar nem os 12s de graca) — e o disparo manual ignora o gate de rosto.
-    captureFallbackBtn.addEventListener('click', function() {
-        // v3.2: pode cancelar um countdown automatico em andamento (era "contou e
-        // nao capturou" sem saida); so nao interrompe o disparo fisico em curso.
+    // v3.4: captura MANUAL DIRETA (sincrona, sem countdown, sem takePhoto).
+    // CAUSA do "botao sem acao": o handler antigo chamava dispararCaptura()
+    // mas retornava cedo com "if (capturando) return" quando um disparo
+    // anterior deixou capturando=true (toBlob que nunca responde em WebView).
+    // Agora o clique SEMPRE reseta o estado e desenha o frame do video na hora.
+    function capturaManualDireta() {
         try { if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; } } catch (e) {}
         try { countdownOverlay.style.display = 'none'; } catch (e) {}
-        if (capturando) return;
+        try { flashOverlay.classList.remove('solid'); } catch (e) {}
+        capturando = false;
         burstFeito = true;
-        capturaManual = true;   // PACOTE CALIBRAGEM SELFIE: disparo manual ignora o gate de rosto
-        dispararCaptura();       // v3.2: captura DIRETO (sem countdown: 1 toque = 1 foto)
+        capturaManual = true;
+        try { pararGuias(); } catch (e2) { guiasAtivas = false; }
+        try {
+            if (!video.videoWidth || video.readyState < 2) {
+                setStatus('A camera ainda esta inicializando. Aguarde um instante e toque em Capturar Foto de novo.', 'warning');
+                try { iniciarGuias(); } catch (e3) {}
+                return;
+            }
+            var fonteW = video.videoWidth, fonteH = video.videoHeight;
+            var targetRatio = 3 / 4, sourceRatio = fonteW / fonteH;
+            var sourceWidth = fonteW, sourceHeight = fonteH, sourceX = 0, sourceY = 0;
+            if (sourceRatio > targetRatio) { sourceWidth = fonteH * targetRatio; sourceX = (fonteW - sourceWidth) / 2; }
+            else { sourceHeight = fonteW / targetRatio; sourceY = (fonteH - sourceHeight) / 2; }
+            var maxLarg = 900;
+            var esc = Math.min(1, maxLarg / sourceWidth);
+            canvas.width = Math.round(sourceWidth * esc);
+            canvas.height = Math.round(sourceHeight * esc);
+            var cx2 = canvas.getContext('2d');
+            cx2.save();
+            cx2.translate(canvas.width, 0);
+            cx2.scale(-1, 1);
+            cx2.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+            cx2.restore();
+            var urlDados = null;
+            try { urlDados = canvas.toDataURL('image/jpeg', 0.92); previewImg.src = urlDados; } catch (e4) {}
+            video.style.display = 'none';
+            preview.style.display = 'block';
+            setStatus('Selfie capturada! Confira a imagem e toque em Confirmar e Continuar.', 'success', false);
+            if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e5) {} }
+            var blobPronto = false;
+            var finalizarBlob = function(b) {
+                if (blobPronto || !b) return;
+                blobPronto = true;
+                blobCapturado = b;
+            };
+            var dataURLParaBlob = function() {
+                if (blobPronto || !urlDados) return;
+                try {
+                    var partes = urlDados.split(',');
+                    var mime = partes[0].match(/:(.*?);/)[1];
+                    var bin = atob(partes[1]);
+                    var arr = new Uint8Array(bin.length);
+                    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                    finalizarBlob(new Blob([arr], { type: mime }));
+                } catch (e6) {}
+            };
+            try {
+                canvas.toBlob(function(b) { if (b) { finalizarBlob(b); } else { dataURLParaBlob(); } }, 'image/jpeg', 0.92);
+                setTimeout(dataURLParaBlob, 1500);
+            } catch (e7) { dataURLParaBlob(); }
+        } catch (err) {
+            console.warn('capturaManualDireta falhou:', err);
+            setStatus('Nao consegui capturar. Toque em Capturar Foto de novo.', 'warning');
+            try { iniciarGuias(); } catch (e8) {}
+        }
+    }
+    captureFallbackBtn.addEventListener('click', function() {
+        capturaManualDireta();
     });
 
     // Plano B: usa a camera NATIVA do celular (input capture) e entrega o arquivo no MESMO
@@ -989,7 +1049,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // v2: marca o inicio da fase "Analisando" (o teto de 5s e contado a partir daqui)
         analiseInicio = performance.now();
         analiseLenta = false;
-        guiasAtivas = false; try { cancelAnimationFrame(guidanceFrame); } catch (e) {} guidanceFrame = null; if (overlayCtx) overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+        guiasAtivas = false; try { cancelAnimationFrame(guidanceFrame); } catch (e) {} guidanceFrame = null;
+        // v3.3: o trecho antigo referenciava overlayCtx/overlay (variaveis que NAO
+        // existem) e isso quebrava o dispararCaptura() com ReferenceError — era o
+        // "botao sem acao" e o "contou e nao capturou".
         // v3.2: SEM gate de rosto no disparo. O guarda antigo (!faceOk => volta a
         // orientar) descartava a captura DEPOIS do countdown 3-2-1 se o detector
         // mudasse de ideia no ultimo frame — era o "contou e nao capturou".
