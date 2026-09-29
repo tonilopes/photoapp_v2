@@ -44,14 +44,21 @@ O S23 Ultra é o aparelho que **mais** cai nas causas 1–3 (frontal mais lenta 
 ```powershell
 # Windows, na raiz do projeto
 python pacote_selfie_calibragem/aplicar_transformacoes.py --diff     # lista o que será mudado
-python pacote_selfie_calibragem/aplicar_transformacoes.py --aplicar  # aplica (backup .bak_pacote_<data>)
+python pacote_selfie_calibragem/aplicar_transformacoes.py --aplicar  # aplica por âncoras (backup .bak_pacote_<data>)
 python pacote_selfie_calibragem/validar_pacote.py                    # valida sintaxe JS + template
 ```
 
 ```bash
-# VPS / Linux, na raiz do projeto
-python3 pacote_selfie_calibragem/aplicar_transformacoes.py --aplicar
+# VPS / Linux — use a ROTA DE CÓPIA (não depende de casar âncoras com o arquivo do servidor)
+python3 pacote_selfie_calibragem/aplicar_transformacoes.py --copiar
+# (equivalente em shell)
+bash pacote_selfie_calibragem/aplicar_pacote.sh
 ```
+
+> `--aplicar` (âncoras) só funciona se o arquivo da máquina for **exatamente a versão base** que gerou
+> o pacote. Se for diferente (caso típico do VPS, que pode ter versão mais antiga ou intermediária),
+> o script **avisa e não altera nada**; aí use `--copiar` / `aplicar_pacote.sh`, que instala a versão
+> final pronta (e também avisa se o pacote já estiver aplicado).
 
 O script **aborta sem alterar nada** se o arquivo tiver mudado desde 25/09/2026 (cada âncora precisa
 aparecer exatamente 1 vez). Nesse caso use a Opção B ou peça para eu ajustar as âncoras.
