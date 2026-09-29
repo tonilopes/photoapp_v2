@@ -317,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // ("Afaste o rosto" com o rosto pequeno/longe) e o aluno nunca saia do loop:
     // "rosto nao reconhecido", "muito perto" estando longe, sem nunca capturar.
     // REVERSAO: apagar este bloco e restaurar FACE_MIN 0.28 / FACE_MAX 0.55 + mensagens antigas.
-    console.log('PACOTE CALIBRAGEM SELFIE ativo (25/09/2026) - formando');
+    console.log('PACOTE CALIBRAGEM SELFIE ativo (v2 - 29/09/2026) - formando');
     const GUIA = {
         faceMin: 0.16,            // antes 0.28 — faixa realista para camera frontal larga
         faceMax: 0.50,            // antes 0.55
@@ -325,12 +325,50 @@ document.addEventListener('DOMContentLoaded', function() {
         gracaManualMs: 12000,     // apos 12s sem enquadramento, mostra o botao manual
         retryLeituraMs: 800,      // NotReadableError (tipico Samsung): espera e tenta 1x
         toleranciaCentroX: 0.20,  // antes 0.15
-        toleranciaCentroY: 0.22   // antes 0.18
+        toleranciaCentroY: 0.22,  // antes 0.18
+        // ===== v2 (29/09/2026): analise com TETO DE TEMPO (nunca mais "demorou demais") =====
+        analiseMs: 5000,          // teto da analise: estourou, a foto SEGUE (nao obriga refazer)
+        intervaloGuiaMs: 160,     // detector de rosto ~6x/s (antes: a cada frame)
+        larguraAnalise: 480,      // analise em imagem reduzida (antes 900x1200 cheio)
+        larguraCaptura: 1200      // teto da foto do hardware (12MP+ travava a analise)
     };
     let guiaDeteccoes = 0;        // quantas vezes o detector avaliou de verdade
     let guiaErros = 0;            // excecoes seguidas do detector
     let capturaManual = false;    // disparo pelo botao manual (ignora o gate de rosto)
     let temporizadorManual = null;
+    let guiaUltimaDeteccao = 0;   // v2: controle do throttle do detector de rosto
+    let analiseLenta = false;     // v2: a validacao automatica estourou o teto nesta captura
+    let analiseInicio = 0;        // v2: inicio da fase "Analisando..."
+
+    // v2: promessa com teto de tempo — devolve o valor padrao se estourar (nunca segura o aluno)
+    function comTempoLimite(promessa, ms, valorPadrao) {
+        return Promise.race([
+            Promise.resolve(promessa).catch(function() { return valorPadrao; }),
+            new Promise(function(resolve) { setTimeout(function() { resolve(valorPadrao); }, ms); })
+        ]);
+    }
+
+    // v2: bitmap reduzido (MediaPipe nao precisa de muitos pixels; a foto cheia custa caro em CPU)
+    async function reduzirBitmap(fonte, larguraMax) {
+        let bmp = null;
+        try {
+            bmp = await createImageBitmap(fonte, { resizeWidth: larguraMax, resizeQuality: 'low' });
+        } catch (e) {
+            bmp = await createImageBitmap(fonte);
+        }
+        try {
+            if (!bmp.width || bmp.width <= larguraMax) return bmp;
+            const escala = larguraMax / bmp.width;
+            const cv = document.createElement('canvas');
+            cv.width = larguraMax;
+            cv.height = Math.max(1, Math.round(bmp.height * escala));
+            cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+            if (bmp.close) bmp.close();
+            return cv;
+        } catch (e2) {
+            return bmp;
+        }
+    }
 
     let faceLandmarker = null;
     let guidanceFrame = null;
@@ -503,6 +541,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!guiasAtivas) return;          // parado durante captura/preview
         if (detectorUnavailable) return;   // sem detector: o botao manual assume
         if (!faceLandmarker || !video.videoWidth || video.readyState < 2) { agendarGuia(); return; }
+        // v2: limita a ~6 deteccoes por segundo (antes rodava a cada frame). No aparelho que
+        // caiu para o delegate CPU isso consumia a maquina toda e deixava a analise lenta.
+        const agoraGuia = performance.now();
+        if (agoraGuia - guiaUltimaDeteccao < GUIA.intervaloGuiaMs) { agendarGuia(); return; }
+        guiaUltimaDeteccao = agoraGuia;
         if (!faceOk) inicioQualidadeOk = null;  // saiu do enquadramento: zera acumulação
         const result = faceLandmarker.detectForVideo(video, performance.now());
         const faces = result.faceLandmarks || [];
@@ -612,7 +655,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // liberar e, se nada funcionar, a camera NATIVA do celular no MESMO fluxo.
     // REVERSAO: apagar estas funcoes e voltar ao bloco unico de getUserMedia + alert.
     const COMBINACOES_CAMERA = [
-        { video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false },
+        // v2: 1280x960 (antes 1920x1440) — a saida final e 900x1200; o excedente so deixava
+        // o detector de rosto e a analise pesados em aparelho que cai para o delegate CPU.
+        { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false },
         { video: { facingMode: 'user' }, audio: false },
         { video: true, audio: false }
     ];
@@ -729,7 +774,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     async function validarCandidato(blob) {
         try {
-            const bmp = await createImageBitmap(blob);
+            const bmp = await reduzirBitmap(blob, GUIA.larguraAnalise);   // v2: analise reduzida (rapido em CPU)
             const W = bmp.width, H = bmp.height;
             let score = 100, motivos = [];
             if (faceLandmarker) {
@@ -768,7 +813,11 @@ document.addEventListener('DOMContentLoaded', function() {
         let melhor = null;
         for (let ii = 0; ii < cands.length; ii++) {
             if (detalhe) detalhe.textContent = 'Analisando foto ' + (ii + 1) + ' de ' + cands.length + '...';
-            const rr = await validarCandidato(cands[ii].blob);
+            // v2: teto de tempo do que sobrou da fase de analise (GUIA.analiseMs = 5s).
+            // Se estourar, a foto e aprovada com score neutro — o aluno nunca fica preso.
+            const restanteMs = Math.max(800, GUIA.analiseMs - (performance.now() - (analiseInicio || performance.now())));
+            const rr = await comTempoLimite(validarCandidato(cands[ii].blob), restanteMs, { score: 60, motivo: '', tempo: true });
+            if (rr.tempo) analiseLenta = true;
             cands[ii].score = rr.score; cands[ii].motivo = rr.motivo;
             if (!melhor || rr.score > melhor.score) melhor = cands[ii];
             if (rr.score >= 85) break;
@@ -783,7 +832,9 @@ document.addEventListener('DOMContentLoaded', function() {
             blobCapturado = melhor.blob;
             previewImg.src = URL.createObjectURL(melhor.blob);
             if (melhor.score >= 55) {
-                setStatus('Foto selecionada! Confira e toque em Confirmar e Continuar ou Fazer outra.', 'success', false);
+                setStatus(analiseLenta
+                    ? 'Foto selecionada (a análise automática foi lenta neste aparelho). Confira e toque em Confirmar e Continuar.'
+                    : 'Foto selecionada! Confira e toque em Confirmar e Continuar ou Fazer outra.', 'success', false);
             } else {
                 setStatus('Usando a melhor foto disponivel. Confira e toque em Confirmar e Continuar.', 'warning', false);
             }
@@ -901,6 +952,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function dispararCaptura() {
         // NOVO: fecha a captura e mostra Analisando (apagar este if reverte)
         if (typeof mostrarAnaliseSegura === 'function') { mostrarAnaliseSegura('Capturando e validando sua foto...'); } else if (typeof mostrarAnalise === 'function') { mostrarAnalise('Capturando e validando sua foto...'); }
+        // v2: marca o inicio da fase "Analisando" (o teto de 5s e contado a partir daqui)
+        analiseInicio = performance.now();
+        analiseLenta = false;
         guiasAtivas = false; try { cancelAnimationFrame(guidanceFrame); } catch (e) {} guidanceFrame = null; if (overlayCtx) overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
         if (faceLandmarker && !faceOk && !capturaManual) {   // PACOTE CALIBRAGEM SELFIE
             burstFeito = false;
@@ -943,7 +997,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 1ª foto full-res com timeout generoso (algun hardware pide toque en el obturador)
                 try {
                     const blobFoto = await Promise.race([captor.takePhoto(), conTimeout(1500)]);
-                    const bitmap = await createImageBitmap(blobFoto);
+                    // v2: a foto do hardware pode vir enorme (12MP+) e travar a analise;
+                    // entra reduzida (a saida final e 900x1200, entao 1200 de largura sobra)
+                    const bitmap = await reduzirBitmap(blobFoto, GUIA.larguraCaptura);
                     fontes.push(bitmap);
                 } catch (e) {
                     console.warn('takePhoto #1 falhou/timeout; burst de vídeo.', e);
@@ -956,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (!quadroTempCanvas) quadroTempCanvas = document.createElement('canvas');
         let guarda = 0;
-        while (fontes.length < 2 && guarda < 8 && (performance.now() - inicio) < 3000) {
+        while (fontes.length < 2 && guarda < 5 && (performance.now() - inicio) < 1500) {
             guarda++;
             if (video.videoWidth && video.readyState >= 2) {
                 if (quadroTempCanvas.width !== video.videoWidth || quadroTempCanvas.height !== video.videoHeight) {

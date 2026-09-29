@@ -14,13 +14,221 @@ document.addEventListener('DOMContentLoaded', function() {
     maxSizeKB: 900
   };
 
+  // ===== PACOTE CALIBRAGEM SELFIE (25/09/2026) =====
+  // CAUSA: em celulares de FOV largo (ex.: Galaxy S23 Ultra, frontal ~80 graus) o rosto
+  // ocupa MENOS largura do quadro. Com FACE_MIN=0.28 o app mandava a mensagem INVERTIDA
+  // ("Afaste o rosto" com o rosto pequeno/longe) e o aluno ficava preso: "rosto nao
+  // reconhecido", "muito perto" estando longe, sem nunca conseguir capturar/salvar.
+  // REVERSAO: apagar este bloco e restaurar FACE_MIN 0.28 / FACE_MAX 0.55 + mensagens antigas.
+  console.log('PACOTE CALIBRAGEM SELFIE ativo (v2 - 29/09/2026)');
+  const GUIA = {
+    faceMin: 0.16,            // antes 0.28 — faixa realista para camera frontal larga
+    faceMax: 0.50,            // antes 0.55
+    confiancaDeteccao: 0.45,  // antes 0.65 — rosto mais afastado volta a ser detectado
+    gracaManualMs: 12000,     // apos 12s sem enquadramento, libera a captura manual
+    retryLeituraMs: 800,      // NotReadableError (tipico Samsung): espera liberar e tenta 1x
+    toleranciaCentroX: 0.20,  // antes 0.15
+    toleranciaCentroY: 0.22,  // antes 0.18
+    // ===== v2 (29/09/2026): analise da foto com TETO DE TEMPO (nunca mais "demorou demais") =====
+    analiseMs: 5000,          // teto da analise: estourou, a foto SEGUE (nao obriga refazer)
+    intervaloGuiaMs: 160,     // detector de rosto ~6x/s (antes: a cada frame, ate 60x/s)
+    larguraAnalise: 480       // analisa imagem reduzida (antes 900x1200 cheio): CPU muito mais leve
+  };
+  let gracaAvisada = false;
+  let retryLeituraFeito = false;
+  let analiseLenta = false;   // v2: a validacao automatica estourou o teto nesta captura
+
+  // v2: promessa com teto de tempo — devolve o valor padrao se estourar (nunca segura o aluno)
+  function comTempoLimite(promessa, ms, valorPadrao) {
+    return Promise.race([
+      Promise.resolve(promessa).catch(function() { return valorPadrao; }),
+      new Promise(function(resolve) { setTimeout(function() { resolve(valorPadrao); }, ms); })
+    ]);
+  }
+
+  // v2: bitmap reduzido (MediaPipe nao precisa de muitos pixels; 900x1200 em CPU custa caro)
+  async function reduzirBitmap(fonte, larguraMax) {
+    let bmp = null;
+    try {
+      bmp = await createImageBitmap(fonte, { resizeWidth: larguraMax, resizeQuality: 'low' });
+    } catch (e) {
+      bmp = await createImageBitmap(fonte);
+    }
+    try {
+      if (!bmp.width || bmp.width <= larguraMax) return bmp;
+      const escala = larguraMax / bmp.width;
+      const cv = document.createElement('canvas');
+      cv.width = larguraMax;
+      cv.height = Math.max(1, Math.round(bmp.height * escala));
+      cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+      if (bmp.close) bmp.close();
+      return cv;
+    } catch (e2) {
+      return bmp;
+    }
+  }
+
+  function criarBitmapParaAnalise(fonte) {
+    return reduzirBitmap(fonte, GUIA.larguraAnalise);
+  }
+
+
+  // NOVO anti-careta: overlay Analisando + validação de expressão (reversível).
+  // Para reverter: apagar este bloco NOVO e as chamadas mostrarAnalise/esconderAnalise.
+  let faceLandmarkerNovo = null;   // FaceLandmarker (478 pts: EAR/gaze/boca) — null = segue fluxo antigo
+  let importMapaTentado = false;
+  function mostrarAnaliseModal(texto) {
+    const ov = document.getElementById('analiseOverlay');
+    const dt = document.getElementById('analiseDetalhe');
+    if (dt && texto) dt.textContent = texto;
+    if (ov) { ov.style.display = 'flex'; }
+    if (cameraStatus && texto) cameraStatus.innerHTML = '🔍 ' + texto;
+    ligarWatchdogAnalise();
+  }
+  function esconderAnaliseModal() {
+    const ov = document.getElementById('analiseOverlay');
+    if (ov) { ov.style.display = 'none'; }
+    if (janelaAnaliseTimer) { clearTimeout(janelaAnaliseTimer); janelaAnaliseTimer = null; }
+  }
+  // ===== HOTFIX salvamento (25/09/2026) =====
+  // CAUSA RAIZ: o handler do botao "Capturar" chamava pararDeteccaoFacial() — que NUNCA
+  // existiu neste arquivo. Isso lancava ReferenceError dentro do handler async, abortando
+  // toda a captura: o overlay "Analisando sua foto" ficava preso para sempre e o aluno
+  // nao conseguia confirmar/salvar. Reversao: apagar deste comentario ate reabilitarBotaoCapturar().
+  let janelaAnaliseTimer = null;
+  let tentativasReprovadasModal = 0;
+  function pararDeteccaoFacial() {
+    try {
+      if (faceDetectionFrame) { cancelAnimationFrame(faceDetectionFrame); faceDetectionFrame = null; }
+    } catch (e) {}
+    faceGuidance.valid = false;
+    faceGuidance.available = false;
+  }
+  function retomarDeteccaoFacial() {
+    try {
+      const v = document.getElementById('selfie-video');
+      if (v && faceDetector && !faceDetectionFrame) {
+        faceGuidance.available = true;
+        faceGuidance.valid = false;
+        faceGuidance.deteccoes = 0;   // PACOTE CALIBRAGEM SELFIE: so reabre o gate apos nova avaliacao
+        faceGuidance.erros = 0;
+        faceGuidance.inicio = performance.now();
+        faceDetectionFrame = requestAnimationFrame(function() { orientarEnquadramento(v); });
+      }
+    } catch (e) {}
+  }
+  function reabilitarBotaoCapturar() {
+    if (captureBtn) { captureBtn.style.display = 'inline-block'; captureBtn.disabled = false; }
+    if (refazerBtn) refazerBtn.style.display = 'none';
+    if (confirmarBtn) confirmarBtn.style.display = 'none';
+  }
+  function ligarWatchdogAnalise() {
+    if (janelaAnaliseTimer) clearTimeout(janelaAnaliseTimer);
+    janelaAnaliseTimer = setTimeout(function() {
+      janelaAnaliseTimer = null;
+      esconderAnaliseModal();
+      retomarDeteccaoFacial();
+      reabilitarBotaoCapturar();
+      if (cameraStatus) cameraStatus.innerHTML = '⚠️ A análise demorou demais. Toque em Capturar novamente.';
+    }, 20000);
+  }
+  // PACOTE CALIBRAGEM SELFIE (25/09/2026): o delegate 'GPU' do MediaPipe falha em varios
+  // Androids (Adreno/One UI) e, antes, o erro derrubava o loop de orientacao (tela travada,
+  // aluno sem conseguir capturar). Agora tenta GPU e cai automaticamente para CPU.
+  // REVERSAO: chamar Classe.createFromOptions(fileset, opcoes) direto com delegate: 'GPU'.
+  async function criarComDelegateFallback(Classe, fileset, base, opcoes) {
+    let ultimoErro = null;
+    for (const delegado of ['GPU', 'CPU']) {
+      try {
+        const instancia = await Classe.createFromOptions(fileset, Object.assign({}, opcoes, {
+          baseOptions: Object.assign({}, base, { delegate: delegado })
+        }));
+        console.log('✅ Detector facial criado (delegate=' + delegado + ')');
+        return instancia;
+      } catch (e) {
+        ultimoErro = e;
+        console.warn('⚠️ Detector facial com delegate ' + delegado + ' falhou:', e);
+      }
+    }
+    throw (ultimoErro || new Error('Nao foi possivel criar o detector facial'));
+  }
+
+  async function carregarLandmarkerSePreciso() {
+    if (faceLandmarkerNovo || importMapaTentado) return faceLandmarkerNovo;
+    importMapaTentado = true;
+    try {
+      if (!window.SelfieValidacao) return null; // sem o JS de validação, segue fluxo antigo
+      const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+      const { FaceLandmarker, FilesetResolver } = vision;
+      const fileset = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+      faceLandmarkerNovo = await criarComDelegateFallback(FaceLandmarker, fileset, {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
+      }, {
+        runningMode: 'VIDEO',
+        numFaces: 2, // >1 = intruso (foto colada)
+        minFaceDetectionConfidence: 0.3,
+        minFacePresenceConfidence: 0.3
+      });
+      console.log('✅ [NOVO] FaceLandmarker anti-careta ativo');
+    } catch (e) {
+      console.warn('[NOVO] Landmarker indisponível, segue fluxo antigo:', e);
+      faceLandmarkerNovo = null;
+    }
+    return faceLandmarkerNovo;
+  }
+  async function validarExpressaoModal(video) {
+    // Retorna [] = OK. Sem landmarker/JS = [] (não bloqueia — fluxo antigo vale).
+    try {
+      if (!window.SelfieValidacao) return [];
+      const lm = await carregarLandmarkerSePreciso();
+      if (!lm) return [];
+      const res = await lm.detectForVideo(video, performance.now());
+      const faces = (res && res.faceLandmarks) || [];
+      if (faces.length > 1) return ['Mais de um rosto detectado! Fique sozinho no quadro.'];
+      if (!faces.length) return []; // deixa o FaceDetector antigo decidir "sem rosto"
+      return window.SelfieValidacao.validarExpressao(faces[0], video.videoWidth || 640, video.videoHeight || 480);
+    } catch (e) {
+      console.warn('[NOVO] validarExpressao fallback:', e);
+      return [];
+    }
+  }
+  async function validarFotoFinalModal(imgElOuCanvas) {
+    // Valida o frame capturado (detectForVideo no bitmap final). Score <55 = refazer.
+    try {
+      if (!window.SelfieValidacao) return { ok: true, motivo: '' };
+      const lm = await carregarLandmarkerSePreciso();
+      if (!lm) return { ok: true, motivo: '' };
+      // v2: analisa em resolucao reduzida (rapido mesmo quando o detector cai para CPU)
+      const bmp = await criarBitmapParaAnalise(imgElOuCanvas);
+      const W = bmp.width, H = bmp.height;
+      const res = await lm.detectForVideo(bmp, performance.now());
+      const faces = (res && res.faceLandmarks) || [];
+      if (bmp.close) bmp.close();
+      if (!faces.length) return { ok: false, motivo: 'Nenhum rosto na foto.' };
+      if (faces.length > 1) return { ok: false, motivo: 'Mais de um rosto na foto.' };
+      const alertas = window.SelfieValidacao.validarExpressao(faces[0], W, H);
+      if (alertas.length) return { ok: false, motivo: alertas[0] };
+      const ys = faces[0].map(p => p.y * H);
+      const ratio = (Math.max.apply(null, ys) - Math.min.apply(null, ys)) / H;
+      if (ratio > 0.62) return { ok: false, motivo: 'Rosto muito perto — afaste-se (~um braço).' };
+      if (ratio < 0.22) return { ok: false, motivo: 'Rosto muito longe — aproxime-se.' };
+      return { ok: true, motivo: '' };
+    } catch (e) {
+      console.warn('[NOVO] validarFotoFinal fallback (aprova):', e);
+      return { ok: true, motivo: '' };
+    }
+  }
+
   let imagemCapturada = null;
   let streamAtivo = null;
   let eventoId = null;
   let alunoId = null;
   let faceDetector = null;
   let faceDetectionFrame = null;
-  let faceGuidance = { available: false, valid: false };
+  // PACOTE CALIBRAGEM SELFIE: deteccoes/erros/inicio permitem saber se o detector
+  // REALMENTE avaliou o rosto (o gate do botao "Capturar" so vale se deteccoes > 0) e
+  // servem de cronometro para a liberacao manual. Reversao: voltar ao objeto antigo.
+  let faceGuidance = { available: false, valid: false, deteccoes: 0, erros: 0, inicio: 0 };
   let ultimoAvisoFalado = '';
   let qualidadeAtual = { brilho: 'ok', nitidez: 'ok' };
   let ultimaAvaliacaoQualidade = 0;
@@ -157,19 +365,25 @@ document.addEventListener('DOMContentLoaded', function() {
       const fileset = await vision.FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
       );
-      faceDetector = await vision.FaceDetector.createFromOptions(fileset, {
-        baseOptions: {
-          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'
-        },
+      faceDetector = await criarComDelegateFallback(vision.FaceDetector, fileset, {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'
+      }, {
         runningMode: 'VIDEO',
-        minDetectionConfidence: 0.65
+        minDetectionConfidence: GUIA.confiancaDeteccao
       });
       faceGuidance.available = true;
+      faceGuidance.deteccoes = 0;
+      faceGuidance.erros = 0;
+      faceGuidance.inicio = performance.now();
       orientarEnquadramento(video);
+      // v2: ja baixa/prepara o modelo da validacao de expressao enquanto o aluno se enquadra.
+      // Antes esse download (~3 MB) acontecia no clique de "Capturar" e a analise "demorava".
+      try { carregarLandmarkerSePreciso(); } catch (e) {}
     } catch (error) {
       console.warn('Orientação facial indisponível:', error);
       faceGuidance.available = false;
-      atualizarStatus('Câmera pronta. Centralize seu rosto e mantenha boa iluminação.', false);
+      faceGuidance.deteccoes = 0;   // PACOTE CALIBRAGEM SELFIE: sem detector, captura manual livre
+      atualizarStatus('Câmera pronta. Toque em Capturar quando estiver enquadrado.', false);
     }
   }
 
@@ -183,31 +397,78 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (e) {}
   }
 
+  // ===== PACOTE CALIBRAGEM SELFIE (25/09/2026): o loop de orientacao NUNCA pode morrer =====
+  // CAUSA: se o video ainda nao tinha imagem (camera frontal "fria", comum nos Samsung) ou
+  // se o detectForVideo lancava excecao (delegate GPU), a funcao saia SEM reagendar o
+  // requestAnimationFrame. Resultado: available=true + valid=false PARA SEMPRE e o gate do
+  // botao "Capturar" travava o aluno definitivamente ("rosto nao reconhecido", "muito
+  // perto/longe" em loop, sem conseguir salvar).
+  // REVERSAO: apagar o wrapper e voltar a funcao unica com "if (!faceDetector || video.readyState < 2) return;".
+  function liberarCapturaManual() {
+    if (gracaAvisada) return;
+    gracaAvisada = true;
+    if (cameraStatus) cameraStatus.innerHTML = '📷 Você pode tocar em Capturar a qualquer momento — cuidamos da qualidade depois.';
+    if (navigator.vibrate) navigator.vibrate(80);
+  }
+
   function orientarEnquadramento(video) {
-    if (!faceDetector || video.readyState < 2) return;
+    try {
+      orientarEnquadramentoInterno(video);
+    } catch (e) {
+      faceGuidance.erros += 1;
+      console.warn('orientarEnquadramento erro #' + faceGuidance.erros + ':', e);
+      if (faceGuidance.erros >= 5) {
+        faceGuidance.available = false;   // nao gateia mais: o aluno captura manualmente
+        atualizarStatus('Enquadramento automático indisponível. Toque em Capturar.', false);
+      }
+    } finally {
+      if (!faceGuidance.valid && faceGuidance.deteccoes > 0 &&
+          (performance.now() - faceGuidance.inicio) > GUIA.gracaManualMs) {
+        liberarCapturaManual();
+      }
+      faceDetectionFrame = (faceGuidance.available && faceGuidance.erros < 5)
+        ? requestAnimationFrame(function() { orientarEnquadramento(video); })
+        : null;
+    }
+  }
+
+  function orientarEnquadramentoInterno(video) {
+    if (!faceDetector) return;                                         // sem detector: nao gateia
+    if (!video || video.readyState < 2 || !video.videoWidth) return;    // camera aquecendo: reagenda
+    // v2: limita a ~6 deteccoes por segundo (antes rodava a cada frame). No aparelho que caiu
+    // para o delegate CPU isso consumia a maquina inteira e deixava a captura/analise lentas.
+    const agoraGuia = performance.now();
+    if (agoraGuia - (faceGuidance.ultimaDeteccao || 0) < GUIA.intervaloGuiaMs) return;
+    faceGuidance.ultimaDeteccao = agoraGuia;
     const resultado = faceDetector.detectForVideo(video, performance.now());
-    const faces = resultado.detections || [];
+    const faces = (resultado && resultado.detections) || [];
+    faceGuidance.deteccoes += 1;
     faceGuidance.valid = false;
 
     if (faces.length === 0) {
-      atualizarStatus('Aproxime o rosto e olhe para a câmera.');
+      atualizarStatus('Não encontrei o rosto. Aproxime um pouco e olhe para a câmera.');
     } else if (faces.length > 1) {
       atualizarStatus('Deixe apenas uma pessoa na frente da câmera.');
     } else {
       const box = faces[0].boundingBox;
       const centerX = box.originX + box.width / 2;
       const centerY = box.originY + box.height / 2;
-      const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * 0.15 &&
-        Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * 0.18;
-      // Oval MENOR: exige rosto mais longe (~50-60cm) para caber, evitando
-      // distorção grande-angular. Qualidade mantida (captura em alta resolução).
-      const FACE_MIN = 0.28, FACE_MAX = 0.55;
-      const goodSize = box.width > video.videoWidth * FACE_MIN && box.width < video.videoWidth * FACE_MAX;
+      const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * GUIA.toleranciaCentroX &&
+        Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * GUIA.toleranciaCentroY;
+      // FAIXA REALISTA DE DISTANCIA: com FACE_MIN 0.28 o rosto tinha de ficar colado na
+      // camera e, quando ele estava PEQUENO/longe, a mensagem mandava AFASTAR — o aluno ia
+      // para o lado errado e nunca passava no enquadramento. Reversao: FACE_MIN 0.28 / FACE_MAX 0.55.
+      const largura = box.width / video.videoWidth;
+      const goodSize = largura > GUIA.faceMin && largura < GUIA.faceMax;
 
       if (!centered) {
-        atualizarStatus('Centralize o rosto no oval menor da tela.');
+        atualizarStatus('Centralize o rosto no oval da tela.');
+      } else if (largura <= GUIA.faceMin) {
+        atualizarStatus('Aproxime um pouco o rosto: ele está pequeno dentro do oval.');
+      } else if (largura >= GUIA.faceMax) {
+        atualizarStatus('Afaste um pouco o rosto: ele está maior que o oval.');
       } else if (!goodSize) {
-        atualizarStatus(box.width < video.videoWidth * FACE_MIN ? 'Afaste o rosto até caber todo dentro do oval.' : 'Muito perto! Afaste bem o rosto até caber no oval.');
+        atualizarStatus('Ajuste a distância até o rosto caber no oval.');
       } else {
         const agora = performance.now();
         if (agora - ultimaAvaliacaoQualidade > 350) {
@@ -226,7 +487,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
     }
-    faceDetectionFrame = requestAnimationFrame(() => orientarEnquadramento(video));
+    // PACOTE CALIBRAGEM SELFIE: o reagendamento do requestAnimationFrame passou a ser feito
+    // pelo wrapper orientarEnquadramento() (bloco finally) — assim o loop nunca fica sem a
+    // proxima volta, mesmo quando o video ainda esta aquecendo ou o detector falha.
   }
 
   // EVENT: Modal aberto
@@ -254,8 +517,80 @@ document.addEventListener('DOMContentLoaded', function() {
     cameraModal.addEventListener('hidden.bs.modal', function() {
       console.log('\n📺 ========== MODAL FECHADO ==========');
       console.log('🎬 evento "hidden.bs.modal" disparado');
+      // HOTFIX salvamento: limpa overlay/contador ao fechar (reversao: apagar estas 2 linhas)
+      if (typeof esconderAnaliseModal === 'function') esconderAnaliseModal();
+      tentativasReprovadasModal = 0;
+      pararDeteccaoFacial();   // PACOTE CALIBRAGEM SELFIE: encerra o loop de orientacao ao fechar
       pararCamera();
     });
+  }
+
+  // ===== PACOTE CALIBRAGEM SELFIE (25/09/2026): PLANO B universal =====
+  // Cobre os casos em que a API de camera nao pode ser usada no aparelho/navegador do aluno:
+  // webview de WhatsApp/Instagram (sem navigator.mediaDevices), permissao negada, camera
+  // ocupada por outro app (NotReadableError, tipico da Samsung) ou falha de GPU.
+  // Usa a camera NATIVA pelo <input capture="user"> e entra no MESMO fluxo de
+  // preview/confirmar/salvar (o servidor recebe o mesmo JPEG base64).
+  // REVERSAO: apagar esta funcao e as chamadas oferecerCapturaPorArquivo().
+  function oferecerCapturaPorArquivo(motivo) {
+    try {
+      let entrada = document.getElementById('selfie-arquivo-fallback');
+      if (!entrada) {
+        entrada = document.createElement('input');
+        entrada.type = 'file';
+        entrada.id = 'selfie-arquivo-fallback';
+        entrada.accept = 'image/*';
+        entrada.setAttribute('capture', 'user');
+        entrada.style.display = 'none';
+        entrada.addEventListener('change', function() {
+          const arquivo = entrada.files && entrada.files[0];
+          if (!arquivo) return;
+          if (cameraStatus) cameraStatus.innerHTML = '⏳ Preparando sua foto...';
+          const leitor = new FileReader();
+          leitor.onload = function() {
+            const aux = new Image();
+            aux.onload = function() {
+              const cv = document.createElement('canvas');
+              cv.width = CONFIG_SELFIE.width;
+              cv.height = CONFIG_SELFIE.height;
+              const c2 = cv.getContext('2d');
+              const escala = Math.max(cv.width / aux.width, cv.height / aux.height);
+              const lw = aux.width * escala, lh = aux.height * escala;
+              c2.drawImage(aux, (cv.width - lw) / 2, (cv.height - lh) / 2, lw, lh);
+              imagemCapturada = cv.toDataURL('image/jpeg', CONFIG_SELFIE.quality);
+              esconderAnaliseModal();
+              mostrarTelaPreview(false);   // foto do celular ja vem como o aluno ve
+            };
+            aux.onerror = function() { alert('Não foi possível ler a foto escolhida. Tente de novo.'); };
+            aux.src = leitor.result;
+          };
+          leitor.onerror = function() { alert('Não foi possível ler a foto escolhida. Tente de novo.'); };
+          leitor.readAsDataURL(arquivo);
+        });
+        document.body.appendChild(entrada);
+      }
+
+      let botao = document.getElementById('btn-selfie-arquivo');
+      if (!botao) {
+        botao = document.createElement('button');
+        botao.type = 'button';
+        botao.id = 'btn-selfie-arquivo';
+        botao.className = 'btn btn-warning btn-lg mt-2';
+        botao.innerHTML = '📱 Usar a câmera do celular';
+        botao.addEventListener('click', function() { entrada.click(); });
+        const alvo = (captureBtn && captureBtn.parentNode) ? captureBtn.parentNode : document.body;
+        alvo.appendChild(botao);
+      }
+      botao.style.display = 'inline-block';
+
+      if (cameraStatus) {
+        cameraStatus.innerHTML = '📱 ' + (motivo || 'Vamos usar a câmera do seu celular.')
+          + ' Toque em "Usar a câmera do celular".';
+      }
+      try { entrada.click(); } catch (e) { console.warn('clique automatico bloqueado:', e); }
+    } catch (e) {
+      console.warn('Fallback de arquivo indisponivel:', e);
+    }
   }
 
   // ================== PARAR CÂMERA ==================
@@ -309,11 +644,13 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function continuarInicializacao() {
+    retryLeituraFeito = false;   // PACOTE CALIBRAGEM SELFIE: cada abertura pode tentar de novo
     console.log('\n[1/6] 🔍 Verificando suporte a getUserMedia...');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       console.error('❌ getUserMedia NÃO DISPONÍVEL - Browser não suporta');
-      if (cameraStatus) cameraStatus.innerHTML = '❌ Navegador não suporta câmera';
-      alert('Seu navegador não suporta acesso à câmera. Use Chrome, Firefox ou Safari.');
+      if (cameraStatus) cameraStatus.innerHTML = '❌ Este navegador não libera a câmera (comum em links abertos dentro do WhatsApp/Instagram).';
+      alert('Este navegador não libera a câmera — comum em links abertos dentro do WhatsApp ou Instagram.\n\nVamos usar a câmera do seu celular.');
+      oferecerCapturaPorArquivo('Este navegador não libera a câmera.');
       return;
     }
     console.log('✅ getUserMedia disponível');
@@ -504,6 +841,18 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
 
+        // PACOTE CALIBRAGEM SELFIE: NotReadableError ("Could not start video source") e o
+        // erro mais comum nos Galaxys — a camera ainda esta presa por outro app/aba e libera
+        // em menos de 1 segundo. Antes o aluno caia direto no erro.
+        // REVERSAO: apagar este bloco.
+        if (err.name === 'NotReadableError' && !retryLeituraFeito) {
+          retryLeituraFeito = true;
+          console.warn('⚠️  Câmera ocupada — aguardando liberação e tentando novamente...');
+          if (cameraStatus) cameraStatus.innerHTML = '⏳ Liberando a câmera (feche outros apps que usam a câmera)...';
+          setTimeout(function() { tentarGetUserMedia(1); }, GUIA.retryLeituraMs);
+          return;
+        }
+
         // Se chegou aqui, falhou de verdade
         console.error('\n❌❌❌ getUserMedia ERRO CRÍTICO ❌❌❌');
         console.error('  - err.name:', err.name);
@@ -532,10 +881,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         console.error('Mensagem para usuário:', mensagem);
         if (cameraStatus) {
-          cameraStatus.innerHTML = mensagem;
+          cameraStatus.innerHTML = mensagem + ' Use o botão "Usar a câmera do celular".';
           cameraStatus.style.color = '#ff6b6b';
         }
-        alert(mensagem);
+        alert(mensagem + '\n\nDá para tirar a selfie com a câmera do próprio celular: toque em "Usar a câmera do celular".');
+        oferecerCapturaPorArquivo(mensagem);
 
         console.log('\n' + '='.repeat(70));
         console.log('❌ INICIALIZAÇÃO FALHOU');
@@ -549,9 +899,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ================== CAPTURAR FOTO ==================
   if (captureBtn) {
-    captureBtn.addEventListener('click', function() {
+    captureBtn.addEventListener('click', async function() {
       console.log('\n📸 CAPTURANDO FOTO');
-      
+
       const video = document.getElementById('selfie-video');
       if (!video || !streamAtivo) {
         alert('❌ Câmera não está disponível');
@@ -559,34 +909,117 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
 
-      if (faceGuidance.available && !faceGuidance.valid) {
-        atualizarStatus('Ajuste o rosto no enquadramento antes de capturar.');
+      // PACOTE CALIBRAGEM SELFIE: o gate so vale se o detector REALMENTE ja avaliou o rosto
+      // (deteccoes > 0) e ainda dentro da janela de 12s; depois disso o aluno SEMPRE consegue
+      // capturar (a validacao da foto final continua valendo).
+      // REVERSAO: voltar a usar apenas "if (faceGuidance.available && !faceGuidance.valid)".
+      const guiaAtiva = faceGuidance.available === true && faceGuidance.deteccoes > 0;
+      const guiaVencida = (performance.now() - faceGuidance.inicio) > GUIA.gracaManualMs;
+      if (guiaAtiva && !faceGuidance.valid && !guiaVencida) {
+        const aviso = (cameraStatus && cameraStatus.textContent)
+          ? cameraStatus.textContent
+          : 'Ajuste o rosto no oval da tela.';
+        atualizarStatus(aviso + ' (ou aguarde alguns segundos e toque em Capturar).');
         return;
       }
 
       console.log('✅ Video element encontrado');
+
+      // NOVO: fecha a captura e mostra "Analisando sua foto, um momento"
+      if (captureBtn) captureBtn.disabled = true;   // HOTFIX: evita clique duplo durante a analise
+      mostrarAnaliseModal('Analisando sua foto, um momento...');
+      pararDeteccaoFacial();
+      const motivos = [];
+      // v2: teto de tempo TOTAL da analise (GUIA.analiseMs = 5s). Se a validacao automatica
+      // passar disso (modelo baixando/aparelho lento), a foto SEGUE — o aluno nao fica
+      // esperando nem e obrigado a refazer por causa do validador.
+      const inicioAnalise = performance.now();
+      analiseLenta = false;
+      // 1) expressão/olhos/boca/distância/intruso no frame ao vivo (não bloqueia se landmarker falhar)
+      try {
+        const alertasAoVivo = await comTempoLimite(validarExpressaoModal(video), GUIA.analiseMs, null);
+        if (alertasAoVivo === null) analiseLenta = true;
+        else if (alertasAoVivo.length) motivos.push(alertasAoVivo[0]);
+      } catch (e) {}
+      // 2) qualidade (brilho/nitidez) — fluxo antigo
+      try {
+        const q = avaliarQualidadeImagem(video);
+        if (q.brilho !== 'ok') motivos.push(q.brilho === 'escuro' ? 'Foto escura — melhore a iluminação.' : 'Claro demais — evite contraluz.');
+        if (q.nitidez !== 'ok') motivos.push('Foto tremida/embaçada — segure firme.');
+      } catch (e) {}
+
+      // PACOTE CALIBRAGEM SELFIE: a camera frontal "fria" (comum nos Samsung) pode ainda
+      // nao ter quadro — antes isso gerava foto preta ou esticada.
+      // REVERSAO: apagar a verificacao e voltar ao drawImage esticado.
+      if (!video.videoWidth || !video.videoHeight) {
+        esconderAnaliseModal();
+        retomarDeteccaoFacial();
+        reabilitarBotaoCapturar();
+        atualizarStatus('A câmera ainda está iniciando. Aguarde 1 segundo e toque em Capturar novamente.');
+        return;
+      }
 
       // Canvas para captura
       const canvas = document.createElement('canvas');
       canvas.width = CONFIG_SELFIE.width;
       canvas.height = CONFIG_SELFIE.height;
 
+      // Recorte central (equivalente a object-fit: cover) em vez de esticar o quadro
+      // 16:9 dentro de 3:4: mantem a proporcao do rosto (antes ele saia achatado).
       const ctx = canvas.getContext('2d');
-      // Mirror
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, -CONFIG_SELFIE.width, 0, CONFIG_SELFIE.width, CONFIG_SELFIE.height);
+      const escalaCapa = Math.max(CONFIG_SELFIE.width / video.videoWidth, CONFIG_SELFIE.height / video.videoHeight);
+      const larguraCapa = video.videoWidth * escalaCapa;
+      const alturaCapa = video.videoHeight * escalaCapa;
+      ctx.save();
+      ctx.translate(CONFIG_SELFIE.width, 0);
+      ctx.scale(-1, 1);   // espelha igual ao preview
+      ctx.drawImage(video, (CONFIG_SELFIE.width - larguraCapa) / 2, (CONFIG_SELFIE.height - alturaCapa) / 2, larguraCapa, alturaCapa);
+      ctx.restore();
 
+      // NOVO: valida a foto final (frame capturado) — careta de último segundo
+      // v2: usa o tempo que sobrou do teto de 5s (se ja estourou, nao valida e segue com a foto)
+      try {
+        const restanteMs = Math.max(700, GUIA.analiseMs - (performance.now() - inicioAnalise));
+        const checkFinal = await comTempoLimite(validarFotoFinalModal(canvas), restanteMs, null);
+        if (checkFinal === null) analiseLenta = true;
+        else if (!checkFinal.ok) motivos.push(checkFinal.motivo);
+      } catch (e) {}
+
+      // HOTFIX salvamento: reprovacao sem alert() bloqueante e SEM reinicializar a camera
+      // (o "await inicializarCamera()" anterior causava double-init/NotReadableError e, como
+      // o pararDeteccaoFacial() inexistente abortava o handler, nada disso rodava).
+      // Na 3a reprovacao aceita a captura, para ninguem ficar travado sem conseguir salvar.
+      // Reversao: voltar ao if (motivos.length) { alert(...); await inicializarCamera(); return; }
+      if (motivos.length && tentativasReprovadasModal < 2) {
+        tentativasReprovadasModal += 1;
+        esconderAnaliseModal();
+        retomarDeteccaoFacial();
+        reabilitarBotaoCapturar();
+        if (cameraStatus) cameraStatus.innerHTML = '⚠️ Você precisa refazer sua foto: ' + motivos[0] + ' Toque em Capturar novamente.';
+        if (navigator.vibrate) navigator.vibrate(120);
+        return;
+      }
+      if (motivos.length) {
+        tentativasReprovadasModal = 0;
+        if (cameraStatus) cameraStatus.innerHTML = '⚠️ Usando a melhor captura: ' + motivos[0];
+      } else {
+        tentativasReprovadasModal = 0;
+      }
+
+      esconderAnaliseModal();
       imagemCapturada = canvas.toDataURL('image/jpeg', CONFIG_SELFIE.quality);
       console.log('✅ Imagem capturada');
       console.log('📊 Tamanho:', imagemCapturada.length, 'bytes');
 
-      // Mostrar preview
+      // Mostrar preview (só a foto selecionada: [Aprovar/Confirmar] [Fazer outra])
+      if (cameraStatus) cameraStatus.innerHTML = '👀 Foto selecionada! Aprove ou tire outra.';
       mostrarTelaPreview();
     });
   }
 
   // ================== PREVIEW ==================
-  function mostrarTelaPreview() {
+  function mostrarTelaPreview(espelhar) {
+    pararDeteccaoFacial();   // PACOTE CALIBRAGEM SELFIE: nao deixa o loop de orientacao rodando no preview
     console.log('\n🖼️  Mostrando preview da imagem');
     
     // Parar câmera
@@ -602,12 +1035,16 @@ document.addEventListener('DOMContentLoaded', function() {
     img.style.height = '100%';
     img.style.objectFit = 'cover';
     img.style.borderRadius = '8px';
-    img.style.transform = 'scaleX(-1)';
+    img.style.transform = (espelhar === false) ? 'none' : 'scaleX(-1)';
 
     cameraArea.appendChild(img);
 
     // Atualizar status
-    if (cameraStatus) cameraStatus.innerHTML = '👀 Visualize sua selfie. Aprove ou tire outra.';
+    if (cameraStatus) {
+      cameraStatus.innerHTML = analiseLenta
+        ? '👀 Foto capturada (a análise automática foi lenta neste aparelho). Aprove ou tire outra.'
+        : '👀 Visualize sua selfie. Aprove ou tire outra.';
+    }
 
     // Botões
     if (captureBtn) captureBtn.style.display = 'none';
@@ -621,8 +1058,9 @@ document.addEventListener('DOMContentLoaded', function() {
   if (refazerBtn) {
     refazerBtn.addEventListener('click', function() {
       console.log('\n🔄 REFAZENDO - Voltando para câmera');
-      
+
       imagemCapturada = null;
+      esconderAnaliseModal(); // NOVO: garante overlay fechado
       
       if (captureBtn) captureBtn.style.display = 'inline-block';
       if (refazerBtn) refazerBtn.style.display = 'none';

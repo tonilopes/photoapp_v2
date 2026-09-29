@@ -89,3 +89,26 @@ No navegador do aparelho (cache limpo) o console deve mostrar
 - O oval/guia visual e os limiares do `selfie_validacao.js` (anti-careta).
 - Pendência conhecida: `aluno_selfie_obrigatoria.html` continua sem plano B para webview/permissão
   negada (dá para aplicar o mesmo padrão depois, se quiser).
+
+## 7. v2 — 29/09/2026 (análise com teto de tempo)
+
+Motivo (relato em campo): "A análise demorou demais, tentar novamente" — o *watchdog* de 20 s
+estourava porque: (a) o loop de orientação rodava o MediaPipe **a cada frame** (até 60×/s) e o
+aparelho do aluno caiu para o delegate **CPU**; (b) o modelo (~3 MB) era baixado **no clique** de
+Capturar; (c) a validação rodava em imagem cheia e a foto do hardware podia vir com 12 MP+.
+
+| Mudança | Modal público | Formando |
+|---|---|---|
+| Teto de **5 s** para a análise (estourou → **a foto segue**) | `GUIA.analiseMs` + `comTempoLimite()` nas 2 validações | idem em `analisarBurst` (score neutro 60 + aviso discreto) |
+| Detector de rosto ~6×/s (antes: a cada frame) | `GUIA.intervaloGuiaMs` em `orientarEnquadramentoInterno` | idem em `updateGuidanceInterno` |
+| Imagem analisada reduzida (480 px) | `criarBitmapParaAnalise()` | `reduzirBitmap(blob, GUIA.larguraAnalise)` |
+| Modelo pré-carregado ao abrir a câmera | `carregarLandmarkerSePreciso()` no start | já existia (`loadFaceLandmarker`) |
+| Foto do hardware limitada a 1200 px | — | `reduzirBitmap(blobFoto, GUIA.larguraCaptura)` |
+| Câmera 1280×960 (antes 1920×1440) | — | `COMBINACOES_CAMERA` |
+| Coleta de quadros 1,5 s (antes 3 s) | — | `obterMelhorQuadro` |
+| Mensagem honesta quando a análise foi lenta | `analiseLenta` no status do preview | idem |
+| Marcador de versão no console | `PACOTE CALIBRAGEM SELFIE ativo (v2 - 29/09/2026)` | idem + ` - formando` |
+
+Garantias mantidas: a validação automática é *best-effort* — quem decide é a checagem de qualidade
+(brilho) e o aluno; o *watchdog* de 20 s continua apenas como rede de segurança.
+

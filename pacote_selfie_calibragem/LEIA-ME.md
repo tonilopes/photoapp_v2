@@ -1,9 +1,17 @@
 # Pacote de calibragem da SELFIE — Galaxy/Samsung (S23 Ultra) e todos os aparelhos
 
-Criado em 25/09/2026. **Nada foi alterado no app**: este pacote fica parado até você mandar aplicar.
-Os arquivos prontos estão em `pacote_selfie_calibragem/arquivos/`.
+Criado em 25/09/2026. Os arquivos prontos estão em `pacote_selfie_calibragem/arquivos/`.
+
+> **v2 — 29/09/2026 (aplicada no app e no GitHub):** análise da foto com **teto de 5 s** —
+> se a validação automática demorar mais que isso, a foto **segue** (o aluno não espera nem é
+> obrigado a refazer). Já incluído: detector de rosto limitado a ~6×/s (antes rodava a cada
+> frame e derrubava o desempenho quando o MediaPipe cai para CPU), modelo pré-carregado ao
+> abrir a câmera, análise em imagem reduzida (480 px) e foto de hardware limitada a 1200 px.
+> **A partir da v2, o código do app (git) é a fonte da verdade**; a pasta `arquivos/` é mantida
+> sincronizada com ele — `--copiar` reinstala exatamente a versão atual (não é downgrade).
 
 ---
+
 
 ## 1. O que o usuário relatou
 

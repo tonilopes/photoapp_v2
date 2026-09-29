@@ -11,6 +11,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Photum Cadastro">
 <script src="{% static 'gestcaptur/js/fase4_publico.js' %}" defer></script>
+<script src="{% static 'gestcaptur/js/selfie_validacao.js' %}" defer></script>
+<style>
+#analiseOverlay{display:none;position:absolute;inset:0;background:rgba(10,12,20,.92);z-index:30;flex-direction:column;align-items:center;justify-content:center;gap:14px;border-radius:12px;text-align:center;padding:20px;}
+#analiseOverlay.mostrar{display:flex;}
+.spinner-analise{width:3rem;height:3rem;border:.4rem solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:giraAnalise .9s linear infinite;}
+@keyframes giraAnalise{to{transform:rotate(360deg);}}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -45,6 +52,11 @@
                             <li>↔️ <strong>Mantenha distância (~um braço):</strong> afaste o rosto até ele caber todo dentro do oval menor — de perto distorce</li>
                             <li>✅ Após capturar a selfie, preencha <strong>todos os campos obrigatórios</strong></li>
                             <li>✅ Após finalizar, você receberá confirmação de cadastro</li>
+                        </ul>
+                        <!-- NOVO anti-careta: orientacao (reversivel: apagar estes 2 li) -->
+                        <ul class="mb-0 mt-2">
+                            <li>😐 <strong>Expressão neutra:</strong> olhe para a câmera, sem caretas, sem revirar/estrabicar os olhos, boca fechada</li>
+                            <li>👤 <strong>Sozinho no quadro:</strong> nenhuma outra pessoa pode aparecer junto</li>
                         </ul>
                     </div>
 
@@ -90,7 +102,13 @@
                 <div class="camera-frame" id="cameraFrame">
                     <video id="video" autoplay playsinline></video>
                     <div class="face-guide" id="faceGuide" aria-hidden="true"></div>
-                    <div class="face-guide-hint" aria-hidden="true">↔️ Afaste o rosto até caber no oval</div>
+                    <div class="face-guide-hint" aria-hidden="true">↔️ Ajuste a distância até o rosto caber no oval (sem cortar)</div>
+                    <!-- NOVO anti-careta: overlay Analisando (reversivel: apagar este bloco) -->
+                    <div id="analiseOverlay">
+                        <div class="spinner-analise"></div>
+                        <div style="color:#fff;font-weight:700;font-size:18px;">Analisando sua foto, um momento...</div>
+                        <div id="analiseDetalhe" style="color:rgba(255,255,255,.75);font-size:13px;">Validando rosto, expressao e qualidade</div>
+                    </div>
                     <div class="countdown-overlay" id="countdownOverlay" aria-hidden="true"><span id="countdownNumber">3</span></div>
                     <div class="flash-overlay" id="flashOverlay" aria-hidden="true"></div>
                 </div>
@@ -292,6 +310,66 @@ document.addEventListener('DOMContentLoaded', function() {
     const flashOverlay = document.getElementById('flashOverlay');
     const btnTentarNovamente = document.getElementById('btnTentarNovamente');
     const captureFallbackBtn = document.getElementById('captureFallbackBtn');
+
+    // ===== PACOTE CALIBRAGEM SELFIE (25/09/2026) =====
+    // CAUSA: em celulares de FOV largo (ex.: Galaxy S23 Ultra, frontal ~80 graus) o rosto
+    // ocupa MENOS largura do quadro. Com FACE_MIN=0.28 o app mandava a mensagem INVERTIDA
+    // ("Afaste o rosto" com o rosto pequeno/longe) e o aluno nunca saia do loop:
+    // "rosto nao reconhecido", "muito perto" estando longe, sem nunca capturar.
+    // REVERSAO: apagar este bloco e restaurar FACE_MIN 0.28 / FACE_MAX 0.55 + mensagens antigas.
+    console.log('PACOTE CALIBRAGEM SELFIE ativo (v2 - 29/09/2026) - formando');
+    const GUIA = {
+        faceMin: 0.16,            // antes 0.28 — faixa realista para camera frontal larga
+        faceMax: 0.50,            // antes 0.55
+        confiancaDeteccao: 0.35,  // antes 0.5 (default) — rosto mais afastado e detectado
+        gracaManualMs: 12000,     // apos 12s sem enquadramento, mostra o botao manual
+        retryLeituraMs: 800,      // NotReadableError (tipico Samsung): espera e tenta 1x
+        toleranciaCentroX: 0.20,  // antes 0.15
+        toleranciaCentroY: 0.22,  // antes 0.18
+        // ===== v2 (29/09/2026): analise com TETO DE TEMPO (nunca mais "demorou demais") =====
+        analiseMs: 5000,          // teto da analise: estourou, a foto SEGUE (nao obriga refazer)
+        intervaloGuiaMs: 160,     // detector de rosto ~6x/s (antes: a cada frame)
+        larguraAnalise: 480,      // analise em imagem reduzida (antes 900x1200 cheio)
+        larguraCaptura: 1200      // teto da foto do hardware (12MP+ travava a analise)
+    };
+    let guiaDeteccoes = 0;        // quantas vezes o detector avaliou de verdade
+    let guiaErros = 0;            // excecoes seguidas do detector
+    let capturaManual = false;    // disparo pelo botao manual (ignora o gate de rosto)
+    let temporizadorManual = null;
+    let guiaUltimaDeteccao = 0;   // v2: controle do throttle do detector de rosto
+    let analiseLenta = false;     // v2: a validacao automatica estourou o teto nesta captura
+    let analiseInicio = 0;        // v2: inicio da fase "Analisando..."
+
+    // v2: promessa com teto de tempo — devolve o valor padrao se estourar (nunca segura o aluno)
+    function comTempoLimite(promessa, ms, valorPadrao) {
+        return Promise.race([
+            Promise.resolve(promessa).catch(function() { return valorPadrao; }),
+            new Promise(function(resolve) { setTimeout(function() { resolve(valorPadrao); }, ms); })
+        ]);
+    }
+
+    // v2: bitmap reduzido (MediaPipe nao precisa de muitos pixels; a foto cheia custa caro em CPU)
+    async function reduzirBitmap(fonte, larguraMax) {
+        let bmp = null;
+        try {
+            bmp = await createImageBitmap(fonte, { resizeWidth: larguraMax, resizeQuality: 'low' });
+        } catch (e) {
+            bmp = await createImageBitmap(fonte);
+        }
+        try {
+            if (!bmp.width || bmp.width <= larguraMax) return bmp;
+            const escala = larguraMax / bmp.width;
+            const cv = document.createElement('canvas');
+            cv.width = larguraMax;
+            cv.height = Math.max(1, Math.round(bmp.height * escala));
+            cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+            if (bmp.close) bmp.close();
+            return cv;
+        } catch (e2) {
+            return bmp;
+        }
+    }
+
     let faceLandmarker = null;
     let guidanceFrame = null;
     let guiasAtivas = true;            // loop de orientação ativo (pausa durante captura/preview)
@@ -395,28 +473,83 @@ document.addEventListener('DOMContentLoaded', function() {
                 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.20/wasm'
             );
             // FaceLandmarker (478 pontos) permite validar a POSE do rosto (perfil vs frontal)
-            faceLandmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-                baseOptions: {
-                    modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-                    delegate: 'GPU'
-                },
-                runningMode: 'VIDEO',
-                numFaces: 2
-            });
+            // PACOTE CALIBRAGEM SELFIE: o delegate GPU falha em varios Androids (Adreno/One UI)
+            // e o erro derrubava o loop de orientacao (aluno preso sem capturar).
+            // REVERSAO: chamar createFromOptions direto com delegate: 'GPU'.
+            let ultimoErro = null;
+            for (const delegado of ['GPU', 'CPU']) {
+                try {
+                    faceLandmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
+                        baseOptions: {
+                            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+                            delegate: delegado
+                        },
+                        runningMode: 'VIDEO',
+                        numFaces: 2,
+                        minFaceDetectionConfidence: GUIA.confiancaDeteccao
+                    });
+                    console.log('Detector facial criado (delegate=' + delegado + ')');
+                    break;
+                } catch (erroDelegate) {
+                    ultimoErro = erroDelegate;
+                    console.warn('Detector facial com delegate ' + delegado + ' falhou:', erroDelegate);
+                    faceLandmarker = null;
+                }
+            }
+            if (!faceLandmarker) throw (ultimoErro || new Error('Detector facial indisponivel'));
             updateGuidance();
         } catch (error) {
             detectorUnavailable = true;
             captureFallbackBtn.classList.remove('d-none');
-            setStatus('Não foi possível ativar a verificação facial. Use o botão "Capturar Foto".', 'danger', false);
+            setStatus('Não foi possível ativar a verificação facial neste aparelho/rede. Use o botão "Capturar Foto" — a selfie vale igual.', 'danger', false);
         }
     }
 
+    // ===== PACOTE CALIBRAGEM SELFIE (25/09/2026): este loop NUNCA pode morrer =====
+    // CAUSA: sair daqui sem reagendar (video ainda sem quadro — camera frontal "fria" dos
+    // Samsung — ou detector ausente) ou uma excecao do detectForVideo deixavam a tela
+    // PARADA para sempre: sem auto-captura, sem aviso e com o botao manual escondido
+    // (ele so aparecia se o DOWNLOAD do modelo falhasse) -> o aluno nao conseguia salvar.
+    // REVERSAO: apagar o wrapper/agendarGuia e restaurar o corpo antigo da funcao.
     function updateGuidance() {
+        try {
+            updateGuidanceInterno();
+        } catch (e) {
+            guiaErros += 1;
+            console.warn('updateGuidance erro #' + guiaErros + ':', e);
+            if (guiaErros >= 3) {
+                detectorUnavailable = true;
+                captureFallbackBtn.classList.remove('d-none');
+                setStatus('Verificação facial instável neste aparelho. Use o botão "Capturar Foto".', 'warning', false);
+                return;
+            }
+            agendarGuia();
+        }
+    }
+
+    // Reagenda o proximo quadro do loop (usado em TODAS as saidas da funcao).
+    // NAO condicionar a guidanceFrame !== null: a primeira chamada (vinda do
+    // loadFaceLandmarker) precisa INICIAR o loop. Com guiasAtivas=false (pararGuias) o
+    // agendamento nao acontece e o epilogo zera guidanceFrame.
+    function agendarGuia() {
+        if (guiasAtivas && !detectorUnavailable) {
+            guidanceFrame = requestAnimationFrame(updateGuidance);
+        }
+    }
+
+    function updateGuidanceInterno() {
         if (!guiasAtivas) return;          // parado durante captura/preview
-        if (!faceLandmarker || video.readyState < 2) return;
+        if (detectorUnavailable) return;   // sem detector: o botao manual assume
+        if (!faceLandmarker || !video.videoWidth || video.readyState < 2) { agendarGuia(); return; }
+        // v2: limita a ~6 deteccoes por segundo (antes rodava a cada frame). No aparelho que
+        // caiu para o delegate CPU isso consumia a maquina toda e deixava a analise lenta.
+        const agoraGuia = performance.now();
+        if (agoraGuia - guiaUltimaDeteccao < GUIA.intervaloGuiaMs) { agendarGuia(); return; }
+        guiaUltimaDeteccao = agoraGuia;
         if (!faceOk) inicioQualidadeOk = null;  // saiu do enquadramento: zera acumulação
         const result = faceLandmarker.detectForVideo(video, performance.now());
         const faces = result.faceLandmarks || [];
+        guiaDeteccoes += 1;   // PACOTE CALIBRAGEM SELFIE: conta avaliacoes reais do detector
         faceOk = false;
         if (!faces.length) {
             setStatus('Nenhum rosto encontrado. Aproxime o rosto e olhe para a câmera.', 'warning');
@@ -424,6 +557,18 @@ document.addEventListener('DOMContentLoaded', function() {
             setStatus('Há mais de um rosto. Fique sozinho na frente da câmera.', 'warning');
         } else {
             const pontos = faces[0];
+            // NOVO anti-careta: expressao/olhos/boca/distancia bloqueiam o burst (apagar este if reverte)
+            if (window.SelfieValidacao) {
+                let alertasExp = [];
+                try { alertasExp = window.SelfieValidacao.validarExpressao(pontos, video.videoWidth || 640, video.videoHeight || 480); } catch (e) {}
+                if (alertasExp.length) {
+                    setStatus(alertasExp[0], 'warning');
+                    falar(alertasExp[0]);
+                    inicioQualidadeOk = null;
+                    agendarGuia();
+                    return;
+                }
+            }
             let minX = 1, maxX = 0, minY = 1, maxY = 0;
             for (let i = 0; i < pontos.length; i++) {
                 const p = pontos[i];
@@ -435,12 +580,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const larguraRosto = (maxX - minX) * video.videoWidth;
             const centerX = ((minX + maxX) / 2) * video.videoWidth;
             const centerY = ((minY + maxY) / 2) * video.videoHeight;
-            const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * .15 &&
-                Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * .18;
-            // FAIXA IDEAL MENOR: oval reduzido (~44% largura) -> rosto precisa ficar
-            // mais LONGE (~50-60cm) para caber, evitando distorção grande-angular.
-            // Mantém qualidade: captura continua em alta resolução (1920px).
-            const FACE_MIN = 0.28, FACE_MAX = 0.55;
+            // PACOTE CALIBRAGEM SELFIE: tolerancia de centralizacao um pouco maior
+            // (antes .15/.18) — segurar o celular na mao nunca e perfeito.
+            const centered = Math.abs(centerX - video.videoWidth / 2) < video.videoWidth * GUIA.toleranciaCentroX &&
+                Math.abs(centerY - video.videoHeight / 2) < video.videoHeight * GUIA.toleranciaCentroY;
+            // FAIXA IDEAL DE DISTANCIA: o rosto dentro do oval (~44% da largura) mede 40-50%
+            // da largura; em camera de FOV largo (S23 Ultra) mede 16-35%. O piso 0.28 era
+            // inalcancavel e gerava o loop "afaste/aproxime" sem nunca capturar.
+            // REVERSAO: FACE_MIN 0.28, FACE_MAX 0.55.
+            const FACE_MIN = GUIA.faceMin, FACE_MAX = GUIA.faceMax;
             const correctSize = larguraRosto > video.videoWidth * FACE_MIN && larguraRosto < video.videoWidth * FACE_MAX;
             // Feedback visual do oval (verde quando OK)
             const faceGuideEl = document.getElementById('faceGuide');
@@ -454,8 +602,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const dePerfil = desvioNariz > 0.12 || proporcaoPerfil < 0.22;
             if (!centered) {
                 setStatus('Centralize seu rosto dentro do oval menor.', 'warning');
+            } else if (larguraRosto <= video.videoWidth * FACE_MIN) {
+                // PACOTE CALIBRAGEM SELFIE: aqui a mensagem estava INVERTIDA (mandava
+                // afastar quando o rosto estava longe/pequeno) — prendia o aluno no loop.
+                setStatus('↔️ Aproxime o rosto: ele está pequeno demais para caber no oval.', 'warning');
+            } else if (larguraRosto >= video.videoWidth * FACE_MAX) {
+                setStatus('⚠️ Afaste um pouco o rosto: ele está maior que o oval.', 'warning');
             } else if (!correctSize) {
-                setStatus(larguraRosto < video.videoWidth * FACE_MIN ? '↔️ Afaste o rosto: deixe-o menor, cabendo todo dentro do oval.' : '⚠️ Muito perto! Afaste bem o rosto até caber todo dentro do oval.', 'warning');
+                setStatus('Ajuste a distância até o rosto caber no oval.', 'warning');
             } else if (dePerfil) {
                 setStatus('Vire o rosto de frente para a câmera, sem ficar de perfil.', 'warning');
             } else {
@@ -485,34 +639,72 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-        if (guiasAtivas) {
-            guidanceFrame = requestAnimationFrame(updateGuidance);
-        } else {
-            guidanceFrame = null;
-        }
+        agendarGuia();
+        if (!guiasAtivas) guidanceFrame = null;
     }
 
     // Iniciar câmera ao abrir modal
     cameraModal.addEventListener('shown.bs.modal', function() {
-        navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: 'user',
-                width:  { ideal: 1920 },   // pede alta resolução ao hardware
-                height: { ideal: 1440 }
-            },
-            audio: false
-        }).then(stream => {
+        iniciarCameraFormando();
+    });
+
+    // ===== PACOTE CALIBRAGEM SELFIE (25/09/2026) =====
+    // CAUSA: antes havia UMA unica tentativa de getUserMedia e, no erro, apenas um alert()
+    // tecnico em ingles ("Could not start video source" = NotReadableError, o erro mais comum
+    // nos Galaxys). Agora: 3 combinacoes de constraints, nova tentativa apos a camera
+    // liberar e, se nada funcionar, a camera NATIVA do celular no MESMO fluxo.
+    // REVERSAO: apagar estas funcoes e voltar ao bloco unico de getUserMedia + alert.
+    const COMBINACOES_CAMERA = [
+        // v2: 1280x960 (antes 1920x1440) — a saida final e 900x1200; o excedente so deixava
+        // o detector de rosto e a analise pesados em aparelho que cai para o delegate CPU.
+        { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false },
+        { video: { facingMode: 'user' }, audio: false },
+        { video: true, audio: false }
+    ];
+    let retryLeituraFeito = false;
+
+    function iniciarCameraFormando() {
+        retryLeituraFeito = false;
+        tentarCamera(0);
+    }
+
+    function tentarCamera(i) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            oferecerCameraDoCelular('Este navegador não libera a câmera (comum em links abertos dentro do WhatsApp/Instagram).');
+            return;
+        }
+        if (i >= COMBINACOES_CAMERA.length) {
+            oferecerCameraDoCelular('Não foi possível abrir a câmera neste aparelho.');
+            return;
+        }
+        navigator.mediaDevices.getUserMedia(COMBINACOES_CAMERA[i]).then(function(stream) {
             streamAtual = stream;   // guardado para ImageCapture.takePhoto()
             video.srcObject = stream;
-            video.play();
+            const play = video.play();
+            if (play && play.catch) { play.catch(function(e) { console.warn('video.play() falhou:', e); }); }
             setStatus('Analise do rosto iniciando. Olhe para a câmera.', 'info', false);
             guiasAtivas = true;
+            guiaDeteccoes = 0;
             loadFaceLandmarker();
-        }).catch(err => {
-            alert('Erro ao acessar câmera: ' + err.message);
-            console.error(err);
+            agendarLiberacaoManual();
+        }).catch(function(err) {
+            const nome = (err && err.name) || '';
+            console.error('getUserMedia tentativa ' + (i + 1) + ' falhou:', nome, err && err.message);
+            // Camera ainda presa por outro app/aba (tipico da Samsung): espera e tenta de novo
+            if (nome === 'NotReadableError' && !retryLeituraFeito) {
+                retryLeituraFeito = true;
+                setStatus('Liberando a câmera (feche outros apps que estão usando a câmera)...', 'warning', false);
+                setTimeout(function() { tentarCamera(i); }, GUIA.retryLeituraMs);
+                return;
+            }
+            if (i + 1 < COMBINACOES_CAMERA.length) { tentarCamera(i + 1); return; }
+            let msg = 'Não foi possível acessar a câmera neste aparelho.';
+            if (nome === 'NotAllowedError') msg = 'Permissão da câmera negada. Libere a câmera nas configurações do navegador.';
+            else if (nome === 'NotReadableError') msg = 'A câmera está em uso por outro aplicativo. Feche-o e tente novamente.';
+            else if (nome === 'NotFoundError') msg = 'Não encontrei uma câmera neste aparelho.';
+            oferecerCameraDoCelular(msg);
         });
-    });
+    }
 
     // Fechar câmera ao fechar modal
     cameraModal.addEventListener('hidden.bs.modal', function() {
@@ -529,12 +721,141 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         capturando = false;
         burstFeito = false;
+        capturaManual = false;      // PACOTE CALIBRAGEM SELFIE
+        guiaDeteccoes = 0;
+        guiaErros = 0;
+        if (temporizadorManual) { clearTimeout(temporizadorManual); temporizadorManual = null; }
         inicioQualidadeOk = null;
         btnTentarNovamente.classList.add('d-none');
+        // HOTFIX salvamento: limpa overlay/estado ao fechar o modal (reversao: apagar estas 3 linhas)
+        if (typeof encerrarAnalise === 'function') { encerrarAnalise(); tentativasReprovadas = 0; }
+        video.style.display = 'block';
+        preview.style.display = 'none';
+        blobCapturado = null;
     });
 
+    // NOVO fluxo Analisando/Aprovar/Fazer outra (reversivel: apagar ate "Falha")
+    function mostrarAnalise(texto) {
+        const ov = document.getElementById('analiseOverlay');
+        const dt = document.getElementById('analiseDetalhe');
+        if (dt && texto) dt.textContent = texto;
+        if (ov) ov.classList.add('mostrar');
+        try { video.pause(); } catch (e) {}
+    }
+    function esconderAnalise() {
+        const ov = document.getElementById('analiseOverlay');
+        if (ov) ov.classList.remove('mostrar');
+        try { if (video && video.paused) video.play(); } catch (e) {}
+    }
+    // HOTFIX salvamento (25/09/2026): o overlay "Analisando" NUNCA pode ficar preso.
+    // Antes, qualquer saida de erro (rosto fora, foto escura, camera fria) deixava o
+    // spinner cobrindo o video e o botao "Tentar novamente" nao o removia -> o aluno
+    // nunca chegava em "Confirmar e Continuar" e nao conseguia salvar.
+    // Reversao: apagar deste comentario ate o fim de mostrarAnaliseSegura().
+    let watchdogAnalise = null;
+    let tentativasReprovadas = 0;
+    function encerrarAnalise() {
+        if (watchdogAnalise) { clearTimeout(watchdogAnalise); watchdogAnalise = null; }
+        esconderAnalise();
+    }
+    function mostrarAnaliseSegura(texto) {
+        mostrarAnalise(texto);
+        if (watchdogAnalise) clearTimeout(watchdogAnalise);
+        watchdogAnalise = setTimeout(function() {
+            watchdogAnalise = null;
+            esconderAnalise();
+            burstFeito = false;
+            capturando = false;
+            inicioQualidadeOk = null;
+            blobCapturado = null;
+            btnTentarNovamente.classList.remove('d-none');
+            setStatus('A analise demorou demais. Toque em "Tentar novamente".', 'warning');
+        }, 20000);
+    }
+    async function validarCandidato(blob) {
+        try {
+            const bmp = await reduzirBitmap(blob, GUIA.larguraAnalise);   // v2: analise reduzida (rapido em CPU)
+            const W = bmp.width, H = bmp.height;
+            let score = 100, motivos = [];
+            if (faceLandmarker) {
+                const rs = await faceLandmarker.detectForVideo(bmp, performance.now());
+                const fs = (rs && rs.faceLandmarks) || [];
+                // HOTFIX: falha tecnica do landmarker NAO pode impedir o aluno de salvar
+                // (antes: score 0 => "Voce precisa refazer" em loop). Reversao: voltar para score: 0.
+                if (!fs.length) { if (bmp.close) bmp.close(); return { score: 60, motivo: '' }; }
+                if (fs.length > 1) { if (bmp.close) bmp.close(); return { score: 0, motivo: 'Mais de um rosto na foto.' }; }
+                if (window.SelfieValidacao) {
+                    const al = window.SelfieValidacao.validarExpressao(fs[0], W, H);
+                    if (al.length) { score -= 45; motivos.push(al[0]); }
+                }
+                const ys = fs[0].map(function (pp) { return pp.y * H; });
+                const ratio = (Math.max.apply(null, ys) - Math.min.apply(null, ys)) / H;
+                if (ratio > 0.62) { score -= 35; motivos.push('Rosto muito perto.'); }
+                else if (ratio < 0.22) { score -= 25; motivos.push('Rosto muito longe.'); }
+                else if (ratio < 0.30 || ratio > 0.55) score -= 8;
+            }
+            const cv = document.createElement('canvas');
+            cv.width = 96; cv.height = 96;
+            const cx = cv.getContext('2d', { willReadFrequently: true });
+            cx.drawImage(bmp, 0, 0, 96, 96);
+            const dd = cx.getImageData(0, 0, 96, 96).data;
+            let soma = 0, kk;
+            for (kk = 0; kk < dd.length; kk += 4) soma += (0.299 * dd[kk] + 0.587 * dd[kk+1] + 0.114 * dd[kk+2]);
+            const br = soma / (96 * 96);
+            if (br < 55) { score -= 30; motivos.push('Foto escura.'); }
+            else if (br > 215) { score -= 25; motivos.push('Claro demais.'); }
+            if (bmp.close) bmp.close();
+            return { score: Math.max(0, Math.round(score)), motivo: motivos[0] || '' };
+        } catch (e) { return { score: 70, motivo: '' }; }
+    }
+    async function analisarBurst(cands) {
+        const detalhe = document.getElementById('analiseDetalhe');
+        let melhor = null;
+        for (let ii = 0; ii < cands.length; ii++) {
+            if (detalhe) detalhe.textContent = 'Analisando foto ' + (ii + 1) + ' de ' + cands.length + '...';
+            // v2: teto de tempo do que sobrou da fase de analise (GUIA.analiseMs = 5s).
+            // Se estourar, a foto e aprovada com score neutro — o aluno nunca fica preso.
+            const restanteMs = Math.max(800, GUIA.analiseMs - (performance.now() - (analiseInicio || performance.now())));
+            const rr = await comTempoLimite(validarCandidato(cands[ii].blob), restanteMs, { score: 60, motivo: '', tempo: true });
+            if (rr.tempo) analiseLenta = true;
+            cands[ii].score = rr.score; cands[ii].motivo = rr.motivo;
+            if (!melhor || rr.score > melhor.score) melhor = cands[ii];
+            if (rr.score >= 85) break;
+        }
+        encerrarAnalise();
+        burstFeito = false;
+        // HOTFIX salvamento: na 3a reprovacao aceita a melhor captura disponivel, para
+        // ninguem ficar travado sem conseguir salvar (reversao: usar sempre >= 55).
+        const limiarAprovacao = (tentativasReprovadas >= 2) ? 0 : 55;
+        if (melhor && melhor.blob && melhor.score >= limiarAprovacao) {
+            tentativasReprovadas = 0;
+            blobCapturado = melhor.blob;
+            previewImg.src = URL.createObjectURL(melhor.blob);
+            if (melhor.score >= 55) {
+                setStatus(analiseLenta
+                    ? 'Foto selecionada (a análise automática foi lenta neste aparelho). Confira e toque em Confirmar e Continuar.'
+                    : 'Foto selecionada! Confira e toque em Confirmar e Continuar ou Fazer outra.', 'success', false);
+            } else {
+                setStatus('Usando a melhor foto disponivel. Confira e toque em Confirmar e Continuar.', 'warning', false);
+            }
+            if (btnTentarNovamente) btnTentarNovamente.classList.add('d-none');
+            video.style.display = 'none';
+            preview.style.display = 'block';
+        } else {
+            tentativasReprovadas += 1;
+            const motivo = (melhor && melhor.motivo) || 'Nenhuma captura ficou boa.';
+            falharTentativa('Voce precisa refazer sua foto: ' + motivo + ' Toque em Tentar novamente.', 'warning');
+        }
+    }
     // Falha/câmera fria → o usuário recomeça o enquadramento (novo burst único)
     btnTentarNovamente.addEventListener('click', function() {
+        // HOTFIX salvamento: destrava o overlay antes de reenquadrar (reversao: apagar estas 4 linhas)
+        encerrarAnalise();
+        tentativasReprovadas = 0;
+        capturaManual = false;   // PACOTE CALIBRAGEM SELFIE
+        blobCapturado = null;
+        video.style.display = 'block';
+        preview.style.display = 'none';
         burstFeito = false;
         inicioQualidadeOk = null;
         btnTentarNovamente.classList.add('d-none');
@@ -546,8 +867,60 @@ document.addEventListener('DOMContentLoaded', function() {
     captureFallbackBtn.addEventListener('click', function() {
         if (countdownTimer || capturando) return;
         burstFeito = true;
+        capturaManual = true;   // PACOTE CALIBRAGEM SELFIE: disparo manual ignora o gate de rosto
         iniciarCountdown(2, 500);
     });
+
+    // Plano B: usa a camera NATIVA do celular (input capture) e entrega o arquivo no MESMO
+    // fluxo de analise/preview/salvar (o servidor recebe o multipart 'foto' de sempre).
+    function oferecerCameraDoCelular(motivo) {
+        setStatus(motivo + ' Toque em "Usar a câmera do celular".', 'danger', false);
+        const jaExiste = document.getElementById('btnCameraCelular');
+        if (jaExiste) { jaExiste.classList.remove('d-none'); return; }
+
+        const entrada = document.createElement('input');
+        entrada.type = 'file';
+        entrada.id = 'entradaCameraCelular';
+        entrada.accept = 'image/*';
+        entrada.setAttribute('capture', 'user');
+        entrada.style.display = 'none';
+        entrada.addEventListener('change', function() {
+            const arquivo = entrada.files && entrada.files[0];
+            if (!arquivo) return;
+            blobCapturado = arquivo;
+            try { previewImg.src = URL.createObjectURL(arquivo); } catch (e) { console.warn(e); }
+            if (typeof encerrarAnalise === 'function') encerrarAnalise();
+            if (typeof pararGuias === 'function') pararGuias();
+            video.style.display = 'none';
+            preview.style.display = 'block';
+            setStatus('Foto escolhida! Confira e toque em Confirmar e Continuar.', 'success', false);
+        });
+        document.body.appendChild(entrada);
+
+        const botao = document.createElement('button');
+        botao.type = 'button';
+        botao.id = 'btnCameraCelular';
+        botao.className = 'btn btn-warning mt-2';
+        botao.innerHTML = '<i class="bi bi-phone"></i> Usar a câmera do celular';
+        botao.addEventListener('click', function() { entrada.click(); });
+        const alvo = (captureFallbackBtn && captureFallbackBtn.parentNode)
+            ? captureFallbackBtn.parentNode
+            : cameraModal.querySelector('.modal-body');
+        alvo.appendChild(botao);
+    }
+
+    // Se a captura automatica nao liberar em 12s, mostra o botao manual: o aluno NUNCA fica
+    // sem uma forma de capturar a selfie.
+    function agendarLiberacaoManual() {
+        if (temporizadorManual) { clearTimeout(temporizadorManual); temporizadorManual = null; }
+        temporizadorManual = setTimeout(function() {
+            temporizadorManual = null;
+            if (!faceOk && !blobCapturado && preview.style.display === 'none') {
+                captureFallbackBtn.classList.remove('d-none');
+                setStatus('Se a captura automática não disparar, toque em "Capturar Foto".', 'info', false);
+            }
+        }, GUIA.gracaManualMs);
+    }
 
     function iniciarCountdown(ticks = 3, intervalo = 800) {
         if (countdownTimer || capturando) return;  // já em andamento
@@ -555,7 +928,7 @@ document.addEventListener('DOMContentLoaded', function() {
         countdownOverlay.style.display = 'flex';
         countdownNumber.textContent = restante;
         countdownTimer = setInterval(function() {
-            if (!detectorUnavailable && !faceOk) {
+            if (!detectorUnavailable && !capturaManual && !faceOk) {
                 clearInterval(countdownTimer);
                 countdownTimer = null;
                 countdownOverlay.style.display = 'none';
@@ -577,12 +950,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function dispararCaptura() {
-        if (faceLandmarker && !faceOk) {
+        // NOVO: fecha a captura e mostra Analisando (apagar este if reverte)
+        if (typeof mostrarAnaliseSegura === 'function') { mostrarAnaliseSegura('Capturando e validando sua foto...'); } else if (typeof mostrarAnalise === 'function') { mostrarAnalise('Capturando e validando sua foto...'); }
+        // v2: marca o inicio da fase "Analisando" (o teto de 5s e contado a partir daqui)
+        analiseInicio = performance.now();
+        analiseLenta = false;
+        guiasAtivas = false; try { cancelAnimationFrame(guidanceFrame); } catch (e) {} guidanceFrame = null; if (overlayCtx) overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+        if (faceLandmarker && !faceOk && !capturaManual) {   // PACOTE CALIBRAGEM SELFIE
             burstFeito = false;
+            encerrarAnalise();   // HOTFIX: nao deixa o spinner "Analisando" preso
             setStatus('Rosto de lado ou fora do contorno. Enquadre novamente.', 'warning');
             iniciarGuias();
             return;
         }
+        capturaManual = false;   // PACOTE CALIBRAGEM SELFIE: volta ao modo automatico
         capturando = true;
         pararGuias();   // congela a orientação durante o disparo (evita mensagens piscando)
         if (navigator.vibrate) navigator.vibrate(60);
@@ -616,7 +997,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 1ª foto full-res com timeout generoso (algun hardware pide toque en el obturador)
                 try {
                     const blobFoto = await Promise.race([captor.takePhoto(), conTimeout(1500)]);
-                    const bitmap = await createImageBitmap(blobFoto);
+                    // v2: a foto do hardware pode vir enorme (12MP+) e travar a analise;
+                    // entra reduzida (a saida final e 900x1200, entao 1200 de largura sobra)
+                    const bitmap = await reduzirBitmap(blobFoto, GUIA.larguraCaptura);
                     fontes.push(bitmap);
                 } catch (e) {
                     console.warn('takePhoto #1 falhou/timeout; burst de vídeo.', e);
@@ -629,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (!quadroTempCanvas) quadroTempCanvas = document.createElement('canvas');
         let guarda = 0;
-        while (fontes.length < 2 && guarda < 8 && (performance.now() - inicio) < 3000) {
+        while (fontes.length < 2 && guarda < 5 && (performance.now() - inicio) < 1500) {
             guarda++;
             if (video.videoWidth && video.readyState >= 2) {
                 if (quadroTempCanvas.width !== video.videoWidth || quadroTempCanvas.height !== video.videoHeight) {
@@ -699,6 +1082,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const fonteH = fonte.height || fonte.videoHeight;
         if (!fonteW || !fonteH) {
             setStatus('A câmera ainda está inicializando. Aguarde um instante.', 'warning');
+            encerrarAnalise();         // HOTFIX: nao deixa o spinner "Analisando" preso
             burstFeito = false;        // câmera fria não conta: rearma a auto-captura
             inicioQualidadeOk = null;
             iniciarGuias();
@@ -739,11 +1123,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         brightness /= canvas.width * canvas.height;
         if (brightness < 80) {
+            encerrarAnalise();     // HOTFIX: nao deixa o spinner "Analisando" preso
             falharTentativa('A foto ficou escura. Ajuste a iluminação e toque em "Tentar novamente".');
             inicioQualidadeOk = null;
             return;
         }
         if (brightness > 225) {
+            encerrarAnalise();     // HOTFIX: nao deixa o spinner "Analisando" preso
             falharTentativa('Luz demais no rosto. Evite contraluz e toque em "Tentar novamente".');
             inicioQualidadeOk = null;
             return;
@@ -752,12 +1138,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Converter para blob (JPEG alta qualidade) e mostrar preview
         canvas.toBlob(blob => {
             if (!blob) {
+                if (typeof esconderAnalise === 'function') esconderAnalise();
                 falharTentativa('Falha ao processar a foto. Toque em "Tentar novamente".', 'danger');
                 inicioQualidadeOk = null;
                 return;
             }
             blobCapturado = blob;
             const url = URL.createObjectURL(blob);
+            // NOVO: valida a foto antes de aprovar (rejeitada = refazer, aprovada = preview)
+            if (typeof analisarBurst === 'function') { analisarBurst([{ blob: blob }]); return; }
+            if (typeof esconderAnalise === 'function') esconderAnalise();
             previewImg.src = url;
 
             setStatus('Selfie capturada! Revisa a imagem e confirma.', 'success', false);
@@ -769,12 +1159,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Tirar novamente: usuário pediu outra foto — permite um novo burst único
     retakeBtn.addEventListener('click', function() {
+        capturaManual = false;   // PACOTE CALIBRAGEM SELFIE
         blobCapturado = null;
         preview.style.display = 'none';
         video.style.display = 'block';
         burstFeito = false;
         inicioQualidadeOk = null;
         btnTentarNovamente.classList.add('d-none');
+        if (typeof esconderAnalise === 'function') esconderAnalise(); // NOVO: garante overlay fechado
         iniciarGuias();
     });
 
@@ -786,9 +1178,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         confirmBtn.disabled = true;
         confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processando...';
-        
-        // Enviar foto para o servidor
-        canvas.toBlob(blob => {
+
+        // HOTFIX salvamento: envia EXATAMENTE o blob aprovado na validacao.
+        // Antes o POST re-encodava o <canvas>, que podia estar vazio quando o overlay
+        // travava em "Analisando" -> o servidor recebia POST sem foto valida.
+        // Reversao: voltar a usar canvas.toBlob(...) como antes.
+        const enviarFoto = function(blob) {
+            if (!blob) {
+                setStatus('Nao foi possivel preparar a foto. Toque em Tirar Novamente.', 'warning');
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<i class="bi bi-check-circle"></i> Confirmar e Continuar';
+                return;
+            }
+            // Enviar foto para o servidor
             const formData = new FormData();
             formData.append('foto', blob, 'selfie.jpg');
             formData.append('etapa', 'selfie');
@@ -821,7 +1223,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 confirmBtn.disabled = false;
                 confirmBtn.innerHTML = '<i class="bi bi-check-circle"></i> Confirmar e Continuar';
             });
-        }, 'image/jpeg', 0.95);
+        };
+        if (blobCapturado) {
+            enviarFoto(blobCapturado);
+        } else {
+            canvas.toBlob(function(blob) { enviarFoto(blob); }, 'image/jpeg', 0.95);
+        }
     });
 });
 </script>
