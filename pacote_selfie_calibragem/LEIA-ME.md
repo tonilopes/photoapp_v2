@@ -2,7 +2,14 @@
 
 Criado em 25/09/2026. Os arquivos prontos estão em `pacote_selfie_calibragem/arquivos/`.
 
-> **v2 — 29/09/2026 (aplicada no app e no GitHub):** análise da foto com **teto de 5 s** —
+> **v3 — 29/09/2026 (ATUAL): análise automática da foto DESLIGADA.** Fluxo: **capturar → preview →
+> a própria pessoa aprova** ("Confirmar"). Sem espera de MediaPipe: no modal público o botão
+> "Capturar" nunca é bloqueado e, no formando, a captura usa **1 quadro** (sem "burst" de 2 fotos)
+> e o brilho é apenas **aviso**, não bloqueio. Cada arquivo tem um bloco `MODO` no topo:
+> para voltar a analisar, basta `MODO.analiseDaFoto = true` (e `validacaoExpressao: true`);
+> para zerar o MediaPipe do enquadramento, `MODO.guiaEnquadramento = false`.
+>
+> **v2 — 29/09/2026:** análise da foto com **teto de 5 s** —
 > se a validação automática demorar mais que isso, a foto **segue** (o aluno não espera nem é
 > obrigado a refazer). Já incluído: detector de rosto limitado a ~6×/s (antes rodava a cada
 > frame e derrubava o desempenho quando o MediaPipe cai para CPU), modelo pré-carregado ao

@@ -317,7 +317,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // ("Afaste o rosto" com o rosto pequeno/longe) e o aluno nunca saia do loop:
     // "rosto nao reconhecido", "muito perto" estando longe, sem nunca capturar.
     // REVERSAO: apagar este bloco e restaurar FACE_MIN 0.28 / FACE_MAX 0.55 + mensagens antigas.
-    console.log('PACOTE CALIBRAGEM SELFIE ativo (v2 - 29/09/2026) - formando');
+    // ===== v3 (29/09/2026): ANALISE AUTOMATICA DA FOTO DESLIGADA =====
+    // Pedido em campo: a fase "Analisando..." demorava no celular do aluno.
+    // Fluxo agora: capturar -> preview -> a PROPRIA PESSOA aprova (Confirmar e Continuar).
+    // Para voltar a analisar a foto: analiseDaFoto: true.
+    const MODO = {
+        analiseDaFoto: false,       // nao roda MediaPipe na foto capturada (zero espera)
+        validacaoExpressao: false,  // anti-caretas desligado
+        guiaEnquadramento: true     // dicas de enquadramento/auto-captura (leve, ~6x/s)
+    };
+    console.log('PACOTE CALIBRAGEM SELFIE ativo (v3 - 29/09/2026) - analise desligada - formando');
     const GUIA = {
         faceMin: 0.16,            // antes 0.28 — faixa realista para camera frontal larga
         faceMax: 0.50,            // antes 0.55
@@ -557,8 +566,8 @@ document.addEventListener('DOMContentLoaded', function() {
             setStatus('Há mais de um rosto. Fique sozinho na frente da câmera.', 'warning');
         } else {
             const pontos = faces[0];
-            // NOVO anti-careta: expressao/olhos/boca/distancia bloqueiam o burst (apagar este if reverte)
-            if (window.SelfieValidacao) {
+            // v3: anti-caretas so roda se a validacao de expressao estiver ligada (MODO)
+            if (MODO.validacaoExpressao && window.SelfieValidacao) {
                 let alertasExp = [];
                 try { alertasExp = window.SelfieValidacao.validarExpressao(pontos, video.videoWidth || 640, video.videoHeight || 480); } catch (e) {}
                 if (alertasExp.length) {
@@ -685,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setStatus('Analise do rosto iniciando. Olhe para a câmera.', 'info', false);
             guiasAtivas = true;
             guiaDeteccoes = 0;
-            loadFaceLandmarker();
+            if (MODO.guiaEnquadramento) loadFaceLandmarker();
             agendarLiberacaoManual();
         }).catch(function(err) {
             const nome = (err && err.name) || '';
@@ -951,7 +960,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function dispararCaptura() {
         // NOVO: fecha a captura e mostra Analisando (apagar este if reverte)
-        if (typeof mostrarAnaliseSegura === 'function') { mostrarAnaliseSegura('Capturando e validando sua foto...'); } else if (typeof mostrarAnalise === 'function') { mostrarAnalise('Capturando e validando sua foto...'); }
+        // v3: overlay "Analisando..." SO se a analise automatica estiver ligada
+        if (MODO.analiseDaFoto) {
+            if (typeof mostrarAnaliseSegura === 'function') { mostrarAnaliseSegura('Capturando e validando sua foto...'); } else if (typeof mostrarAnalise === 'function') { mostrarAnalise('Capturando e validando sua foto...'); }
+        }
         // v2: marca o inicio da fase "Analisando" (o teto de 5s e contado a partir daqui)
         analiseInicio = performance.now();
         analiseLenta = false;
@@ -1009,6 +1021,25 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (e) {
                 console.warn('ImageCapture indisponível; uso burst de vídeo.', e);
             }
+        }
+        // v3: com a analise automatica DESLIGADA basta UM quadro — nao precisa esperar o
+        // burst de 2 fotos nem escolher a mais nitida (era aqui que a captura demorava).
+        if (!MODO.analiseDaFoto) {
+            if (fontes.length) return fontes[0];
+            if (video.videoWidth && video.readyState >= 2) {
+                if (!quadroTempCanvas) quadroTempCanvas = document.createElement('canvas');
+                if (quadroTempCanvas.width !== video.videoWidth || quadroTempCanvas.height !== video.videoHeight) {
+                    quadroTempCanvas.width = video.videoWidth;
+                    quadroTempCanvas.height = video.videoHeight;
+                }
+                quadroTempCanvas.getContext('2d').drawImage(video, 0, 0);
+                const quadro = document.createElement('canvas');
+                quadro.width = quadroTempCanvas.width;
+                quadro.height = quadroTempCanvas.height;
+                quadro.getContext('2d').drawImage(quadroTempCanvas, 0, 0);
+                return quadro;
+            }
+            return null;
         }
         if (!quadroTempCanvas) quadroTempCanvas = document.createElement('canvas');
         let guarda = 0;
@@ -1122,18 +1153,10 @@ document.addEventListener('DOMContentLoaded', function() {
             brightness += (pixels[index] * .299) + (pixels[index + 1] * .587) + (pixels[index + 2] * .114);
         }
         brightness /= canvas.width * canvas.height;
-        if (brightness < 80) {
-            encerrarAnalise();     // HOTFIX: nao deixa o spinner "Analisando" preso
-            falharTentativa('A foto ficou escura. Ajuste a iluminação e toque em "Tentar novamente".');
-            inicioQualidadeOk = null;
-            return;
-        }
-        if (brightness > 225) {
-            encerrarAnalise();     // HOTFIX: nao deixa o spinner "Analisando" preso
-            falharTentativa('Luz demais no rosto. Evite contraluz e toque em "Tentar novamente".');
-            inicioQualidadeOk = null;
-            return;
-        }
+        // v3: o brilho virou AVISO (nao bloqueia mais a foto) — quem decide aprovar e a pessoa
+        let avisoQualidade = '';
+        if (brightness < 80) avisoQualidade = 'A foto ficou escura (prefira local mais iluminado). ';
+        else if (brightness > 225) avisoQualidade = 'Muita luz no rosto (evite contraluz). ';
 
         // Converter para blob (JPEG alta qualidade) e mostrar preview
         canvas.toBlob(blob => {
@@ -1145,12 +1168,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             blobCapturado = blob;
             const url = URL.createObjectURL(blob);
-            // NOVO: valida a foto antes de aprovar (rejeitada = refazer, aprovada = preview)
-            if (typeof analisarBurst === 'function') { analisarBurst([{ blob: blob }]); return; }
+            // v3: analise automatica desligada -> vai direito para o preview (a pessoa aprova)
+            if (MODO.analiseDaFoto && typeof analisarBurst === 'function') { analisarBurst([{ blob: blob }]); return; }
             if (typeof esconderAnalise === 'function') esconderAnalise();
             previewImg.src = url;
 
-            setStatus('Selfie capturada! Revisa a imagem e confirma.', 'success', false);
+            setStatus(avisoQualidade + 'Selfie capturada! Confira a imagem e toque em Confirmar e Continuar.', avisoQualidade ? 'warning' : 'success', false);
+            if (btnTentarNovamente) btnTentarNovamente.classList.add('d-none');
             // Mostrar preview (a detecção já está pausada durante o disparo)
             video.style.display = 'none';
             preview.style.display = 'block';

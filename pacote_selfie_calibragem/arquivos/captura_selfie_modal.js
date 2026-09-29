@@ -20,7 +20,16 @@ document.addEventListener('DOMContentLoaded', function() {
   // ("Afaste o rosto" com o rosto pequeno/longe) e o aluno ficava preso: "rosto nao
   // reconhecido", "muito perto" estando longe, sem nunca conseguir capturar/salvar.
   // REVERSAO: apagar este bloco e restaurar FACE_MIN 0.28 / FACE_MAX 0.55 + mensagens antigas.
-  console.log('PACOTE CALIBRAGEM SELFIE ativo (v2 - 29/09/2026)');
+  // ===== v3 (29/09/2026): ANALISE AUTOMATICA DA FOTO DESLIGADA =====
+  // Pedido em campo: a fase "Analisando sua foto..." demorava no celular do aluno.
+  // Fluxo agora: capturar -> preview -> a PROPRIA PESSOA aprova (Confirmar) ou tira outra.
+  // Para voltar a analisar a foto: analiseDaFoto: true (e validacaoExpressao: true).
+  const MODO = {
+    analiseDaFoto: false,       // nao roda MediaPipe na foto capturada (zero espera)
+    validacaoExpressao: false,  // anti-caretas desligado (fazia parte da analise)
+    guiaEnquadramento: true     // dicas "aproxime/afaste/centralize" (leve, ~6x/s) — so ajuda
+  };
+  console.log('PACOTE CALIBRAGEM SELFIE ativo (v3 - 29/09/2026) - analise desligada');
   const GUIA = {
     faceMin: 0.16,            // antes 0.28 — faixa realista para camera frontal larga
     faceMax: 0.50,            // antes 0.55
@@ -37,6 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
   let gracaAvisada = false;
   let retryLeituraFeito = false;
   let analiseLenta = false;   // v2: a validacao automatica estourou o teto nesta captura
+  let avisosCaptura = [];     // v3: avisos de brilho/nitidez mostrados no preview (nao bloqueiam)
 
   // v2: promessa com teto de tempo — devolve o valor padrao se estourar (nunca segura o aluno)
   function comTempoLimite(promessa, ms, valorPadrao) {
@@ -376,9 +386,8 @@ document.addEventListener('DOMContentLoaded', function() {
       faceGuidance.erros = 0;
       faceGuidance.inicio = performance.now();
       orientarEnquadramento(video);
-      // v2: ja baixa/prepara o modelo da validacao de expressao enquanto o aluno se enquadra.
-      // Antes esse download (~3 MB) acontecia no clique de "Capturar" e a analise "demorava".
-      try { carregarLandmarkerSePreciso(); } catch (e) {}
+      // v2/v3: o modelo da validacao de expressao SO e baixado se essa validacao estiver ligada
+      if (MODO.analiseDaFoto && MODO.validacaoExpressao) { try { carregarLandmarkerSePreciso(); } catch (e) {} }
     } catch (error) {
       console.warn('Orientação facial indisponível:', error);
       faceGuidance.available = false;
@@ -909,43 +918,33 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
 
-      // PACOTE CALIBRAGEM SELFIE: o gate so vale se o detector REALMENTE ja avaliou o rosto
-      // (deteccoes > 0) e ainda dentro da janela de 12s; depois disso o aluno SEMPRE consegue
-      // capturar (a validacao da foto final continua valendo).
-      // REVERSAO: voltar a usar apenas "if (faceGuidance.available && !faceGuidance.valid)".
-      const guiaAtiva = faceGuidance.available === true && faceGuidance.deteccoes > 0;
-      const guiaVencida = (performance.now() - faceGuidance.inicio) > GUIA.gracaManualMs;
-      if (guiaAtiva && !faceGuidance.valid && !guiaVencida) {
-        const aviso = (cameraStatus && cameraStatus.textContent)
-          ? cameraStatus.textContent
-          : 'Ajuste o rosto no oval da tela.';
-        atualizarStatus(aviso + ' (ou aguarde alguns segundos e toque em Capturar).');
-        return;
-      }
+      // v3: SEM GATE — o botao "Capturar" funciona sempre. As dicas de enquadramento continuam
+      // aparecendo no status, mas quem decide e a pessoa (era aqui que o aluno ficava preso).
+      // Reversao: restaurar o bloco guiaAtiva/guiaVencida da versao v1 do pacote.
 
       console.log('✅ Video element encontrado');
 
-      // NOVO: fecha a captura e mostra "Analisando sua foto, um momento"
-      if (captureBtn) captureBtn.disabled = true;   // HOTFIX: evita clique duplo durante a analise
-      mostrarAnaliseModal('Analisando sua foto, um momento...');
+      // v3: o overlay "Analisando..." SO aparece se a analise automatica estiver ligada
+      if (captureBtn) captureBtn.disabled = true;   // evita clique duplo
+      if (MODO.analiseDaFoto) mostrarAnaliseModal('Analisando sua foto, um momento...');
       pararDeteccaoFacial();
-      const motivos = [];
-      // v2: teto de tempo TOTAL da analise (GUIA.analiseMs = 5s). Se a validacao automatica
-      // passar disso (modelo baixando/aparelho lento), a foto SEGUE — o aluno nao fica
-      // esperando nem e obrigado a refazer por causa do validador.
+      const motivos = [];   // v3: so a analise automatica preenche (desligada por padrao)
+      const avisos = [];    // v3: brilho/nitidez = AVISO ao aluno, nunca bloqueio
       const inicioAnalise = performance.now();
       analiseLenta = false;
-      // 1) expressão/olhos/boca/distância/intruso no frame ao vivo (não bloqueia se landmarker falhar)
-      try {
-        const alertasAoVivo = await comTempoLimite(validarExpressaoModal(video), GUIA.analiseMs, null);
-        if (alertasAoVivo === null) analiseLenta = true;
-        else if (alertasAoVivo.length) motivos.push(alertasAoVivo[0]);
-      } catch (e) {}
-      // 2) qualidade (brilho/nitidez) — fluxo antigo
+      // 1) v3: expressao/rosto apenas se a analise estiver ligada
+      if (MODO.analiseDaFoto && MODO.validacaoExpressao) {
+        try {
+          const alertasAoVivo = await comTempoLimite(validarExpressaoModal(video), GUIA.analiseMs, null);
+          if (alertasAoVivo === null) analiseLenta = true;
+          else if (alertasAoVivo.length) motivos.push(alertasAoVivo[0]);
+        } catch (e) {}
+      }
+      // 2) v3: checagem instantanea (pixels locais) -> apenas aviso no preview
       try {
         const q = avaliarQualidadeImagem(video);
-        if (q.brilho !== 'ok') motivos.push(q.brilho === 'escuro' ? 'Foto escura — melhore a iluminação.' : 'Claro demais — evite contraluz.');
-        if (q.nitidez !== 'ok') motivos.push('Foto tremida/embaçada — segure firme.');
+        if (q.brilho !== 'ok') avisos.push(q.brilho === 'escuro' ? 'a foto pode estar escura (procure mais luz).' : 'muita luz direta (evite contraluz).');
+        if (q.nitidez !== 'ok') avisos.push('segure o celular firme: a foto pode ter tremido.');
       } catch (e) {}
 
       // PACOTE CALIBRAGEM SELFIE: a camera frontal "fria" (comum nos Samsung) pode ainda
@@ -976,14 +975,15 @@ document.addEventListener('DOMContentLoaded', function() {
       ctx.drawImage(video, (CONFIG_SELFIE.width - larguraCapa) / 2, (CONFIG_SELFIE.height - alturaCapa) / 2, larguraCapa, alturaCapa);
       ctx.restore();
 
-      // NOVO: valida a foto final (frame capturado) — careta de último segundo
-      // v2: usa o tempo que sobrou do teto de 5s (se ja estourou, nao valida e segue com a foto)
-      try {
-        const restanteMs = Math.max(700, GUIA.analiseMs - (performance.now() - inicioAnalise));
-        const checkFinal = await comTempoLimite(validarFotoFinalModal(canvas), restanteMs, null);
-        if (checkFinal === null) analiseLenta = true;
-        else if (!checkFinal.ok) motivos.push(checkFinal.motivo);
-      } catch (e) {}
+      // v3: validacao da foto final SO se a analise automatica estiver ligada
+      if (MODO.analiseDaFoto) {
+        try {
+          const restanteMs = Math.max(700, GUIA.analiseMs - (performance.now() - inicioAnalise));
+          const checkFinal = await comTempoLimite(validarFotoFinalModal(canvas), restanteMs, null);
+          if (checkFinal === null) analiseLenta = true;
+          else if (!checkFinal.ok) motivos.push(checkFinal.motivo);
+        } catch (e) {}
+      }
 
       // HOTFIX salvamento: reprovacao sem alert() bloqueante e SEM reinicializar a camera
       // (o "await inicializarCamera()" anterior causava double-init/NotReadableError e, como
@@ -1008,7 +1008,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
       esconderAnaliseModal();
       imagemCapturada = canvas.toDataURL('image/jpeg', CONFIG_SELFIE.quality);
-      console.log('✅ Imagem capturada');
+      avisosCaptura = avisos;   // v3: avisos aparecem no preview (nunca bloqueiam a captura)
+      console.log('✅ Imagem capturada (sem análise automática)');
       console.log('📊 Tamanho:', imagemCapturada.length, 'bytes');
 
       // Mostrar preview (só a foto selecionada: [Aprovar/Confirmar] [Fazer outra])
@@ -1041,9 +1042,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Atualizar status
     if (cameraStatus) {
-      cameraStatus.innerHTML = analiseLenta
-        ? '👀 Foto capturada (a análise automática foi lenta neste aparelho). Aprove ou tire outra.'
-        : '👀 Visualize sua selfie. Aprove ou tire outra.';
+      if (avisosCaptura.length) {
+        cameraStatus.innerHTML = '👀 Foto capturada — ' + avisosCaptura.join(' ') + ' Aprove ou tire outra.';
+      } else if (analiseLenta) {
+        cameraStatus.innerHTML = '👀 Foto capturada (a análise automática foi lenta). Aprove ou tire outra.';
+      } else {
+        cameraStatus.innerHTML = '👀 Visualize sua selfie. Aprove ou tire outra.';
+      }
     }
 
     // Botões
