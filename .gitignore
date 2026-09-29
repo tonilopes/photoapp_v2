@@ -141,3 +141,7 @@ gestcaptur/media/
 
 # Scripts de comparacao de manifest
 /_*.sh
+
+# Pacote de calibragem da selfie (25/09/2026)
+*.bak_pacote_*
+/sandbox_pacote_teste/
