@@ -117,7 +117,9 @@
                 </div>
                 
                 <div class="mt-2 mb-3 d-flex justify-content-center gap-2">
-                    <button type="button" class="btn btn-success d-none" id="captureFallbackBtn">
+                    <!-- v3.2: botao manual SEMPRE visivel (antes: escondido por 12s). Se a
+                         auto-captura/countdown falhar por qualquer motivo, a pessoa captura. -->
+                    <button type="button" class="btn btn-success" id="captureFallbackBtn">
                         <i class="bi bi-camera-fill"></i> Capturar Foto
                     </button>
                     <button type="button" class="btn btn-outline-primary d-none" id="btnTentarNovamente">
@@ -888,12 +890,17 @@ document.addEventListener('DOMContentLoaded', function() {
         iniciarGuias();
     });
 
-    // Fallback manual: só aparece se o detector de rosto falhar
+    // Fallback manual: v3.2 o botao fica SEMPRE visivel (nao espera o detector
+    // falhar nem os 12s de graca) — e o disparo manual ignora o gate de rosto.
     captureFallbackBtn.addEventListener('click', function() {
-        if (countdownTimer || capturando) return;
+        // v3.2: pode cancelar um countdown automatico em andamento (era "contou e
+        // nao capturou" sem saida); so nao interrompe o disparo fisico em curso.
+        try { if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; } } catch (e) {}
+        try { countdownOverlay.style.display = 'none'; } catch (e) {}
+        if (capturando) return;
         burstFeito = true;
         capturaManual = true;   // PACOTE CALIBRAGEM SELFIE: disparo manual ignora o gate de rosto
-        iniciarCountdown(2, 500);
+        dispararCaptura();       // v3.2: captura DIRETO (sem countdown: 1 toque = 1 foto)
     });
 
     // Plano B: usa a camera NATIVA do celular (input capture) e entrega o arquivo no MESMO
@@ -983,13 +990,10 @@ document.addEventListener('DOMContentLoaded', function() {
         analiseInicio = performance.now();
         analiseLenta = false;
         guiasAtivas = false; try { cancelAnimationFrame(guidanceFrame); } catch (e) {} guidanceFrame = null; if (overlayCtx) overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
-        if (faceLandmarker && !faceOk && !capturaManual) {   // PACOTE CALIBRAGEM SELFIE
-            burstFeito = false;
-            encerrarAnalise();   // HOTFIX: nao deixa o spinner "Analisando" preso
-            setStatus('Rosto de lado ou fora do contorno. Enquadre novamente.', 'warning');
-            iniciarGuias();
-            return;
-        }
+        // v3.2: SEM gate de rosto no disparo. O guarda antigo (!faceOk => volta a
+        // orientar) descartava a captura DEPOIS do countdown 3-2-1 se o detector
+        // mudasse de ideia no ultimo frame — era o "contou e nao capturou".
+        // Com a analise desligada, quem aprova a foto e a pessoa no preview.
         capturaManual = false;   // PACOTE CALIBRAGEM SELFIE: volta ao modo automatico
         capturando = true;
         pararGuias();   // congela a orientação durante o disparo (evita mensagens piscando)
